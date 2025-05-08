@@ -1,13 +1,11 @@
 import { Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import NavbarLogin from "@/components/ui/navbar/navbar-login";
 
-export default function Login() {
+export default function teknisi() {
   return (
     <main className="min-h-screen bg-white">
-      {/* Navbar */}
-      <NavbarLogin />
+        <h1>Punya Teknisi</h1>
 
       {/* Hero Section */}
       <section className="flex flex-col items-center justify-center min-h-screen bg-[#10316B] text-white">
