@@ -1,10 +1,9 @@
 "use client";
 
-import { Wrench } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import NavbarUser from "@/components/ui/Navbar/navbar-user";
 
 const services = [
   { name: "Handphone", image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=300&auto=format&fit=crop" },
@@ -23,21 +22,11 @@ const recentOrders = [
 export default function Home() {
   return (
     <main className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="flex items-center justify-between px-6 py-4 bg-white shadow-sm">
-        <div className="flex items-center gap-2">
-          <Wrench className="w-8 h-8 text-[#0B409C]" />
-          <span className="text-xl font-bold text-[#0B409C]">PerbaikiinAja</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <Link href="/" className="text-[#10316B]">Home</Link>
-          <Link href="/order" className="text-[#10316B]">Order</Link>
-          <Button className="bg-[#10316B] text-white hover:bg-[#0B409C]">
-            Hi, Firaz!
-          </Button>
-        </div>
-      </nav>
 
+      {/* Navbar  */}
+      <NavbarUser />
+
+      {/* Hero Section */}
       {/* Services Section */}
       <section className="px-6 py-8">
         <div className="flex gap-4 overflow-x-auto pb-4">
