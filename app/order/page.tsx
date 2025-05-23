@@ -21,6 +21,7 @@ export default function OrderPage() {
         credentials: "include",
       });
       const data = await res.json();
+      console.log("Fetched orders:", data);
       setOrders(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch orders", err);
@@ -89,6 +90,26 @@ export default function OrderPage() {
       alert("Failed to create order");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Cancel order handler
+  const handleCancelOrder = async (idPesanan: number) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+    try {
+      const res = await fetch(`/api/pesanan/update-status/${idPesanan}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "dibatalkan" }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        fetchOrders();
+      } else {
+        alert("Failed to cancel order");
+      }
+    } catch (err) {
+      alert("Failed to cancel order");
     }
   };
 
@@ -210,7 +231,18 @@ export default function OrderPage() {
                     <td className="px-4 py-2">
                       Rp{order.harga?.toLocaleString() || "-"}
                     </td>
-                    <td className="px-4 py-2">{order.statusPesanan}</td>
+                    <td className="px-4 py-2">
+                      {order.statusPesanan}
+                      {order.statusPesanan ===
+                        "Menunggu Konfirmasi Teknisi" && (
+                        <button
+                          className="ml-2 px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                          onClick={() => handleCancelOrder(order.id)}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </td>
                     <td className="px-4 py-2">{order.tanggalServis}</td>
                     <td className="px-4 py-2">{order.tanggalSelesai}</td>
                   </tr>
