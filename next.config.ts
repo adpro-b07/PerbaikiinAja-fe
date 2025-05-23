@@ -3,7 +3,14 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: { unoptimized: true },
+  images: {
+    unoptimized: true,
+  },
+  server: {
+    host: '0.0.0.0',
+    port: 3000,
+  },
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   async rewrites() {
     return [
       {
