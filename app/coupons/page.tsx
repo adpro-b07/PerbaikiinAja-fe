@@ -32,6 +32,19 @@ export default function CouponsPage() {
         batasPemakaian: "",
     });
 
+    // Helper function untuk menentukan apakah kupon benar-benar aktif
+    const isKuponReallyActive = (kupon: Kupon) => {
+        const jumlahPemakaian = kupon.jumlahPemakaian || 0;
+        const batasPemakaian = kupon.batasPemakaian || 0;
+
+        // Kupon aktif jika field aktif true DAN masih bisa digunakan
+        // ATAU jika batas pemakaian masih tersisa (sesuai logika backend)
+        return (
+            (kupon.aktif && jumlahPemakaian < batasPemakaian) ||
+            (batasPemakaian > 0 && jumlahPemakaian < batasPemakaian)
+        );
+    };
+
     // Fetch semua kupon
     const fetchAllKupons = async () => {
         try {
@@ -272,12 +285,14 @@ export default function CouponsPage() {
                                 </h3>
                                 <span
                                     className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        kupon.aktif
+                                        isKuponReallyActive(kupon)
                                             ? "bg-green-100 text-green-800"
                                             : "bg-red-100 text-red-800"
                                     }`}
                                 >
-                                    {kupon.aktif ? "Aktif" : "Nonaktif"}
+                                    {isKuponReallyActive(kupon)
+                                        ? "Aktif"
+                                        : "Nonaktif"}
                                 </span>
                             </div>
 
@@ -547,12 +562,14 @@ export default function CouponsPage() {
                                 <span className="font-medium">Status:</span>
                                 <span
                                     className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                                        selectedKupon.aktif
+                                        isKuponReallyActive(selectedKupon)
                                             ? "bg-green-100 text-green-800"
                                             : "bg-red-100 text-red-800"
                                     }`}
                                 >
-                                    {selectedKupon.aktif ? "Aktif" : "Nonaktif"}
+                                    {isKuponReallyActive(selectedKupon)
+                                        ? "Aktif"
+                                        : "Nonaktif"}
                                 </span>
                             </div>
                         </div>
