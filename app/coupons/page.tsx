@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface Kupon {
     kodeKupon: string;
@@ -13,6 +14,8 @@ interface Kupon {
 }
 
 export default function CouponsPage() {
+    const { toast } = useToast();
+
     const [kupons, setKupons] = useState<Kupon[]>([]);
     const [activeKupons, setActiveKupons] = useState<Kupon[]>([]);
     const [inactiveKupons, setInactiveKupons] = useState<Kupon[]>([]);
@@ -36,9 +39,11 @@ export default function CouponsPage() {
     const isKuponReallyActive = (kupon: Kupon) => {
         const jumlahPemakaian = kupon.jumlahPemakaian || 0;
         const batasPemakaian = kupon.batasPemakaian || 0;
-        
-        return ((kupon.aktif && jumlahPemakaian < batasPemakaian) || 
-               (batasPemakaian > 0 && jumlahPemakaian < batasPemakaian));
+
+        return (
+            (kupon.aktif && jumlahPemakaian < batasPemakaian) ||
+            (batasPemakaian > 0 && jumlahPemakaian < batasPemakaian)
+        );
     };
 
     // Validasi persentase
@@ -56,6 +61,11 @@ export default function CouponsPage() {
             setTotalKupons(data.length);
         } catch (error) {
             console.error("Error fetching all kupons:", error);
+            toast({
+                title: "❌ Error",
+                description: "Gagal memuat data kupon",
+                variant: "destructive",
+            });
         }
     };
 
@@ -88,7 +98,7 @@ export default function CouponsPage() {
             await Promise.all([
                 fetchAllKupons(),
                 fetchActiveKupons(),
-                fetchInactiveKupons()
+                fetchInactiveKupons(),
             ]);
         };
         loadData();
@@ -96,13 +106,25 @@ export default function CouponsPage() {
 
     // Handle create kupon
     const handleCreateKupon = async () => {
-        if (!formData.kodeKupon || !formData.potongan || !formData.batasPemakaian) {
-            alert("Mohon isi semua field!");
+        if (
+            !formData.kodeKupon ||
+            !formData.potongan ||
+            !formData.batasPemakaian
+        ) {
+            toast({
+                title: "⚠️ Peringatan",
+                description: "Mohon isi semua field yang diperlukan!",
+                variant: "destructive",
+            });
             return;
         }
 
         if (!validatePercentage(formData.potongan)) {
-            alert("Persentase potongan harus antara 1% - 100%!");
+            toast({
+                title: "⚠️ Validasi Error",
+                description: "Persentase potongan harus antara 1% - 100%!",
+                variant: "destructive",
+            });
             return;
         }
 
@@ -120,7 +142,11 @@ export default function CouponsPage() {
             });
 
             if (response.ok) {
-                alert("Kupon berhasil dibuat!");
+                toast({
+                    title: "✅ Berhasil!",
+                    description: `Kupon ${formData.kodeKupon} berhasil dibuat!`,
+                    variant: "default",
+                });
                 setShowCreateModal(false);
                 setFormData({
                     kodeKupon: "",
@@ -129,23 +155,40 @@ export default function CouponsPage() {
                 });
                 await Promise.all([fetchAllKupons(), fetchActiveKupons()]);
             } else {
-                alert("Gagal membuat kupon. Kode kupon mungkin sudah ada.");
+                toast({
+                    title: "❌ Gagal",
+                    description:
+                        "Gagal membuat kupon. Kode kupon mungkin sudah ada.",
+                    variant: "destructive",
+                });
             }
         } catch (error) {
             console.error("Error creating kupon:", error);
-            alert("Error membuat kupon");
+            toast({
+                title: "❌ Error",
+                description: "Terjadi kesalahan saat membuat kupon",
+                variant: "destructive",
+            });
         }
     };
 
     // Handle update kupon
     const handleUpdateKupon = async () => {
         if (!selectedKupon || !formData.potongan || !formData.batasPemakaian) {
-            alert("Mohon isi semua field!");
+            toast({
+                title: "⚠️ Peringatan",
+                description: "Mohon isi semua field yang diperlukan!",
+                variant: "destructive",
+            });
             return;
         }
 
         if (!validatePercentage(formData.potongan)) {
-            alert("Persentase potongan harus antara 1% - 100%!");
+            toast({
+                title: "⚠️ Validasi Error",
+                description: "Persentase potongan harus antara 1% - 100%!",
+                variant: "destructive",
+            });
             return;
         }
 
@@ -165,7 +208,11 @@ export default function CouponsPage() {
             );
 
             if (response.ok) {
-                alert("Kupon berhasil diupdate!");
+                toast({
+                    title: "✅ Berhasil!",
+                    description: `Kupon ${selectedKupon.kodeKupon} berhasil diupdate!`,
+                    variant: "default",
+                });
                 setShowUpdateModal(false);
                 setSelectedKupon(null);
                 setFormData({
@@ -176,14 +223,22 @@ export default function CouponsPage() {
                 await Promise.all([
                     fetchAllKupons(),
                     fetchActiveKupons(),
-                    fetchInactiveKupons()
+                    fetchInactiveKupons(),
                 ]);
             } else {
-                alert("Gagal mengupdate kupon.");
+                toast({
+                    title: "❌ Gagal",
+                    description: "Gagal mengupdate kupon.",
+                    variant: "destructive",
+                });
             }
         } catch (error) {
             console.error("Error updating kupon:", error);
-            alert("Error mengupdate kupon");
+            toast({
+                title: "❌ Error",
+                description: "Terjadi kesalahan saat mengupdate kupon",
+                variant: "destructive",
+            });
         }
     };
 
@@ -200,20 +255,32 @@ export default function CouponsPage() {
             );
 
             if (response.ok) {
-                alert("Kupon berhasil dihapus!");
+                toast({
+                    title: "✅ Berhasil!",
+                    description: `Kupon ${selectedKupon.kodeKupon} berhasil dihapus!`,
+                    variant: "default",
+                });
                 setShowDeleteModal(false);
                 setSelectedKupon(null);
                 await Promise.all([
                     fetchAllKupons(),
                     fetchActiveKupons(),
-                    fetchInactiveKupons()
+                    fetchInactiveKupons(),
                 ]);
             } else {
-                alert("Gagal menghapus kupon.");
+                toast({
+                    title: "❌ Gagal",
+                    description: "Gagal menghapus kupon.",
+                    variant: "destructive",
+                });
             }
         } catch (error) {
             console.error("Error deleting kupon:", error);
-            alert("Error menghapus kupon");
+            toast({
+                title: "❌ Error",
+                description: "Terjadi kesalahan saat menghapus kupon",
+                variant: "destructive",
+            });
         }
     };
 
@@ -246,7 +313,6 @@ export default function CouponsPage() {
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
             {/* Neon Grid Background */}
-            
 
             {/* Header */}
             <section className="relative px-6 py-12 border-b border-cyan-500/20">
@@ -262,7 +328,6 @@ export default function CouponsPage() {
                             <span className="px-3 py-1 bg-cyan-500/20 border border-cyan-500/50 rounded-full text-cyan-300">
                                 🔥 ACTIVE
                             </span>
-                            
                         </div>
                     </div>
                     <Button
@@ -282,7 +347,9 @@ export default function CouponsPage() {
                             <span className="text-2xl">📊</span>
                         </div>
                         <div>
-                            <h3 className="text-cyan-300 font-medium text-lg mb-1">TOTAL KUPONS</h3>
+                            <h3 className="text-cyan-300 font-medium text-lg mb-1">
+                                TOTAL KUPONS
+                            </h3>
                             <p className="text-5xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
                                 {totalKupons}
                             </p>
@@ -296,7 +363,9 @@ export default function CouponsPage() {
                             <span className="text-2xl">⚡</span>
                         </div>
                         <div>
-                            <h3 className="text-green-300 font-medium text-lg mb-1">ACTIVE NODES</h3>
+                            <h3 className="text-green-300 font-medium text-lg mb-1">
+                                ACTIVE NODES
+                            </h3>
                             <p className="text-5xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                                 {activeCount}
                             </p>
@@ -310,7 +379,9 @@ export default function CouponsPage() {
                             <span className="text-2xl">💤</span>
                         </div>
                         <div>
-                            <h3 className="text-red-300 font-medium text-lg mb-1">INACTIVE NODES</h3>
+                            <h3 className="text-red-300 font-medium text-lg mb-1">
+                                INACTIVE NODES
+                            </h3>
                             <p className="text-5xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent">
                                 {inactiveCount}
                             </p>
@@ -340,8 +411,12 @@ export default function CouponsPage() {
                                         {kupon.kodeKupon}
                                     </h3>
                                     <div className="flex items-center space-x-2">
-                                        <span className="text-xs text-gray-400 font-mono">ID:</span>
-                                        <span className="text-xs text-cyan-300 font-mono">#{kupon.kodeKupon.slice(-4)}</span>
+                                        <span className="text-xs text-gray-400 font-mono">
+                                            ID:
+                                        </span>
+                                        <span className="text-xs text-cyan-300 font-mono">
+                                            #{kupon.kodeKupon.slice(-4)}
+                                        </span>
                                     </div>
                                 </div>
                                 <span
@@ -351,7 +426,9 @@ export default function CouponsPage() {
                                             : "bg-red-500/20 text-red-300 border-red-500/50 shadow-lg shadow-red-500/20"
                                     }`}
                                 >
-                                    {isKuponReallyActive(kupon) ? "🟢 ONLINE" : "🔴 OFFLINE"}
+                                    {isKuponReallyActive(kupon)
+                                        ? "🟢 ONLINE"
+                                        : "🔴 OFFLINE"}
                                 </span>
                             </div>
 
@@ -365,7 +442,7 @@ export default function CouponsPage() {
                                         {kupon.potongan}%
                                     </span>
                                 </div>
-                                
+
                                 <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg border border-purple-500/10">
                                     <span className="text-purple-300 font-medium flex items-center space-x-2">
                                         <span>🎯</span>
@@ -375,7 +452,7 @@ export default function CouponsPage() {
                                         {kupon.batasPemakaian}x
                                     </span>
                                 </div>
-                                
+
                                 <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg border border-pink-500/10">
                                     <span className="text-pink-300 font-medium flex items-center space-x-2">
                                         <span>📈</span>
@@ -389,16 +466,29 @@ export default function CouponsPage() {
                                 {/* Progress Bar */}
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-xs">
-                                        <span className="text-gray-400">Usage Progress</span>
+                                        <span className="text-gray-400">
+                                            Usage Progress
+                                        </span>
                                         <span className="text-gray-300">
-                                            {Math.round(((kupon.jumlahPemakaian || 0) / kupon.batasPemakaian) * 100)}%
+                                            {Math.round(
+                                                ((kupon.jumlahPemakaian || 0) /
+                                                    kupon.batasPemakaian) *
+                                                    100
+                                            )}
+                                            %
                                         </span>
                                     </div>
                                     <div className="w-full bg-slate-700/50 rounded-full h-2 border border-slate-600/50">
-                                        <div 
+                                        <div
                                             className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full transition-all duration-1000"
-                                            style={{ 
-                                                width: `${Math.min(((kupon.jumlahPemakaian || 0) / kupon.batasPemakaian) * 100, 100)}%` 
+                                            style={{
+                                                width: `${Math.min(
+                                                    ((kupon.jumlahPemakaian ||
+                                                        0) /
+                                                        kupon.batasPemakaian) *
+                                                        100,
+                                                    100
+                                                )}%`,
                                             }}
                                         ></div>
                                     </div>
@@ -437,7 +527,7 @@ export default function CouponsPage() {
                                 NEURAL DATABASE EMPTY
                             </h3>
                             <p className="text-gray-400 text-lg">
-                                Initialize your first quantum kupon node
+                                Initialize your first kupon node
                             </p>
                             <Button
                                 onClick={handleOpenCreateModal}
@@ -477,7 +567,7 @@ export default function CouponsPage() {
                                             kodeKupon: e.target.value,
                                         })
                                     }
-                                    placeholder="Enter quantum kupon code"
+                                    placeholder="Enter kupon code"
                                 />
                             </div>
 
@@ -495,7 +585,11 @@ export default function CouponsPage() {
                                     value={formData.potongan}
                                     onChange={(e) => {
                                         const value = e.target.value;
-                                        if (value === '' || (parseFloat(value) >= 1 && parseFloat(value) <= 100)) {
+                                        if (
+                                            value === "" ||
+                                            (parseFloat(value) >= 1 &&
+                                                parseFloat(value) <= 100)
+                                        ) {
                                             setFormData({
                                                 ...formData,
                                                 potongan: value,
@@ -504,7 +598,9 @@ export default function CouponsPage() {
                                     }}
                                     placeholder="1 - 100"
                                 />
-                                <p className="text-xs text-gray-400">Range: 1% - 100%</p>
+                                <p className="text-xs text-gray-400">
+                                    Range: 1% - 100%
+                                </p>
                             </div>
 
                             <div className="space-y-2">
@@ -587,7 +683,11 @@ export default function CouponsPage() {
                                     value={formData.potongan}
                                     onChange={(e) => {
                                         const value = e.target.value;
-                                        if (value === '' || (parseFloat(value) >= 1 && parseFloat(value) <= 100)) {
+                                        if (
+                                            value === "" ||
+                                            (parseFloat(value) >= 1 &&
+                                                parseFloat(value) <= 100)
+                                        ) {
                                             setFormData({
                                                 ...formData,
                                                 potongan: value,
@@ -595,7 +695,9 @@ export default function CouponsPage() {
                                         }
                                     }}
                                 />
-                                <p className="text-xs text-gray-400">Range: 1% - 100%</p>
+                                <p className="text-xs text-gray-400">
+                                    Range: 1% - 100%
+                                </p>
                             </div>
 
                             <div className="space-y-2">
@@ -701,7 +803,9 @@ export default function CouponsPage() {
                                                 : "bg-red-500/20 text-red-300 border-red-500/50"
                                         }`}
                                     >
-                                        {isKuponReallyActive(selectedKupon) ? "🟢 ONLINE" : "🔴 OFFLINE"}
+                                        {isKuponReallyActive(selectedKupon)
+                                            ? "🟢 ONLINE"
+                                            : "🔴 OFFLINE"}
                                     </span>
                                 </div>
                             </div>
@@ -714,16 +818,30 @@ export default function CouponsPage() {
                                 </span>
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">Progress</span>
+                                        <span className="text-gray-400">
+                                            Progress
+                                        </span>
                                         <span className="text-white font-bold">
-                                            {Math.round(((selectedKupon.jumlahPemakaian || 0) / selectedKupon.batasPemakaian) * 100)}%
+                                            {Math.round(
+                                                ((selectedKupon.jumlahPemakaian ||
+                                                    0) /
+                                                    selectedKupon.batasPemakaian) *
+                                                    100
+                                            )}
+                                            %
                                         </span>
                                     </div>
                                     <div className="w-full bg-slate-600/50 rounded-full h-3 border border-slate-500/50">
-                                        <div 
+                                        <div
                                             className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all duration-1000"
-                                            style={{ 
-                                                width: `${Math.min(((selectedKupon.jumlahPemakaian || 0) / selectedKupon.batasPemakaian) * 100, 100)}%` 
+                                            style={{
+                                                width: `${Math.min(
+                                                    ((selectedKupon.jumlahPemakaian ||
+                                                        0) /
+                                                        selectedKupon.batasPemakaian) *
+                                                        100,
+                                                    100
+                                                )}%`,
                                             }}
                                         ></div>
                                     </div>
@@ -753,20 +871,24 @@ export default function CouponsPage() {
                                 Delete Confirmation
                             </h2>
                         </div>
-                        
+
                         <div className="space-y-4 mb-6">
                             <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
                                 <p className="text-red-300 font-medium">
-                                    ⚠️ You are about to permanently delete kupon:
+                                    ⚠️ You are about to permanently delete
+                                    kupon:
                                 </p>
                                 <p className="text-2xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent mt-2">
                                     {selectedKupon.kodeKupon}
                                 </p>
                             </div>
-                            
+
                             <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl">
                                 <p className="text-orange-300 text-sm">
-                                    🔥 This action cannot be undone. All data associated with this kupon will be permanently removed from the quantum database.
+                                    🔥 This action cannot be undone. All data
+                                    associated with this kupon will be
+                                    permanently removed from the
+                                    database.
                                 </p>
                             </div>
                         </div>
