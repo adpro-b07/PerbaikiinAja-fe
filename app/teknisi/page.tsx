@@ -11,132 +11,202 @@ interface Order {
   kondisiBarang: string;
   statusPesanan: string;
   date: string;
+  estimasiHarga?: number;
+  estimasiWaktu?: string;
 }
 
-export default function Teknisi() {
+export default function TeknisiPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [totalOrder, setTotalOrder] = useState<number>(0);
-  const [showModal, setShowModal] = useState(false);
+  const [totalOrder, setTotalOrder] = useState(0);
+  const [selesaiCount, setSelesaiCount] = useState(0);
+  const [totalPenghasilan, setTotalPenghasilan] = useState(0);
+
+  const [showSelesaikanModal, setShowSelesaikanModal] = useState(false);
+  const [showAmbilModal, setShowAmbilModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [laporan, setLaporan] = useState("");
-  const [rating, setRating] = useState(0);
+  const [rating, setRating] = useState<number>(0);
 
-  // Fetch data
-  const fetchOrders = () => {
-    fetch(`/api/pesanan/teknisi/ani@mail.com`)
-      .then((res) => res.json())
-      .then((data) => {
-        setOrders(data);
-        setTotalOrder(data.filter((order: Order) => order.statusPesanan !== "Pesanan Dibatalkan").length);
-      })
-      .catch((err) => console.error("Error fetching orders:", err));
-  };
+  const [estimasiHarga, setEstimasiHarga] = useState("");
+  const [estimasiWaktu, setEstimasiWaktu] = useState("");
+
+  const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
 
   useEffect(() => {
-    fetchOrders();
+    fetch(`/api/pesanan/teknisi/ani@mail.com`)
+      .then((res) => res.json())
+      .then((data: Order[]) => {
+        setOrders(data);
+        setTotalOrder(data.length);
+        const selesaiOrders = data.filter(
+          (order) => order.statusPesanan.toLowerCase() === "selesai"
+        );
+        setSelesaiCount(selesaiOrders.length);
+        const penghasilan = selesaiOrders.reduce(
+          (total, order) => total + (order.estimasiHarga || 0),
+          0
+        );
+        setTotalPenghasilan(penghasilan);
+      })
+      .catch((err) => console.error("Error fetching orders:", err));
   }, []);
 
-  const handleAmbilPesanan = (id: number) => {
-    fetch(`/api/pesanan/ambil-pesanan/${id}`, { method: "POST" })
-      .then(() => {
-        alert("Pesanan berhasil diambil!");
-        fetchOrders();
-      })
-      .catch((err) => console.error(err));
-  };
-
-  const handleDelete = (id: number) => {
-    fetch(`/api/pesanan/delete/${id}`, { method: "DELETE" })
-      .then(() => {
-        alert("Pesanan berhasil dihapus.");
-        fetchOrders();
-      })
-      .catch((err) => console.error(err));
-  };
-
-  const openModal = (id: number) => {
+  const handleOpenAmbilModal = (id: number) => {
     setSelectedOrderId(id);
-    setShowModal(true);
+    setShowAmbilModal(true);
+    setEstimasiHarga("");
+    setEstimasiWaktu("");
   };
 
-  const handleSubmitLaporan = () => {
-    if (!selectedOrderId) return;
+  const handleConfirmAmbilPesanan = () => {
+    if (selectedOrderId === null) return;
+    if (!estimasiHarga || !estimasiWaktu) {
+      alert("Mohon isi estimasi harga dan estimasi waktu.");
+      return;
+    }
 
-    fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
+    const harga = parseInt(estimasiHarga);
+
+    fetch(`/api/pesanan/ambil-pesanan/${selectedOrderId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ laporan, rating }),
+      body: JSON.stringify({
+        estimasiHarga: harga,
+        estimasiWaktu,
+      }),
     })
       .then(() => {
-        return fetch(`/api/pesanan/update-status/${selectedOrderId}`, { method: "PUT" });
-      })
-      .then(() => {
-        alert("Laporan berhasil dikirim dan status diperbarui!");
-        setShowModal(false);
-        setLaporan("");
-        setRating(0);
-        fetchOrders();
+        alert("Pesanan berhasil diambil dengan estimasi.");
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === selectedOrderId
+              ? {
+                  ...order,
+                  statusPesanan: "diproses",
+                  estimasiHarga: harga,
+                  estimasiWaktu,
+                }
+              : order
+          )
+        );
+        setShowAmbilModal(false);
+        setSelectedOrderId(null);
       })
       .catch((err) => console.error(err));
   };
 
-  const aktifOrders = orders.filter((o) => o.statusPesanan !== "Pesanan Dibatalkan" && o.statusPesanan !== "SELESAI");
-  const selesaiOrders = orders.filter((o) => o.statusPesanan === "SELESAI");
+  const handleSelesaikanPesanan = (id: number) => {
+    setSelectedOrderId(id);
+    setShowSelesaikanModal(true);
+  };
+
+  const handleSubmitLaporan = async () => {
+    if (selectedOrderId === null) return;
+    try {
+      await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ laporan }),
+      });
+
+      await fetch(`/api/pesanan/update-status/${selectedOrderId}`, {
+        method: "PUT",
+      });
+
+      alert("Pesanan diselesaikan dan laporan berhasil dikirim.");
+
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === selectedOrderId
+            ? { ...order, statusPesanan: "Selesai" }
+            : order
+        )
+      );
+
+      setLaporan("");
+      setRating(0);
+      setShowSelesaikanModal(false);
+      setSelectedOrderId(null);
+    } catch (err) {
+      console.error("Gagal mengirim laporan:", err);
+    }
+  };
+
+  const handleOpenDetailModal = (id: number) => {
+    setSelectedOrderId(id);
+    setShowDetailModal(true);
+  };
 
   return (
     <main className="min-h-screen bg-white">
       <NavbarTeknisi />
 
-      {/* ACTIVE ORDERS */}
       <section className="px-6 py-8">
         <h2 className="text-xl font-semibold text-[#10316B] mb-4">
           Hi, Teknisi! Berikut orderan yang masuk
         </h2>
+
         <div className="flex items-center space-x-4 overflow-x-auto">
-          {aktifOrders.map((order) => (
+          {orders.map((order) => (
             <div
               key={order.id}
-              className="min-w-[250px] border-2 rounded-2xl p-4 flex-shrink-0"
+              className="min-w-[250px] border-2 rounded-2xl p-4 flex-shrink-0 h-auto"
+              style={{ width: "250px" }}
             >
               <p className="text-lg font-medium mb-2">{order.namaBarang}</p>
               <p className="text-sm mb-1">Deskripsi: {order.kondisiBarang}</p>
-              <p className="text-sm text-gray-500">Status: {order.statusPesanan}</p>
+              <p className="text-sm text-gray-500">
+                Status: {order.statusPesanan}
+              </p>
 
               <button
-                onClick={() => handleAmbilPesanan(order.id)}
-                className="mt-2 w-full py-2 border-2 rounded-xl text-sm font-medium hover:bg-gray-100"
+                onClick={() => handleOpenDetailModal(order.id)}
+                className="mt-2 w-full py-2 border rounded-xl text-sm hover:bg-gray-100"
               >
-                Ambil Pesanan
+                Detail Pesanan
               </button>
 
-              {order.statusPesanan === "DIKERJAKAN" && (
+              {order.statusPesanan === "Menunggu Konfirmasi Teknisi" && (
                 <button
-                  onClick={() => openModal(order.id)}
+                  onClick={() => handleOpenAmbilModal(order.id)}
                   className="mt-2 w-full py-2 border-2 rounded-xl text-sm font-medium hover:bg-gray-100"
                 >
-                  Selesaikan Pesanan
+                  Ambil Pesanan
                 </button>
               )}
 
               <button
-                onClick={() => handleDelete(order.id)}
-                className="mt-2 w-full py-2 border border-red-500 text-red-500 rounded-xl text-sm hover:bg-red-50"
+                onClick={() => handleSelesaikanPesanan(order.id)}
+                className="mt-2 w-full py-2 border-2 rounded-xl text-sm font-medium hover:bg-gray-100"
               >
-                Hapus
+                Selesaikan Pesanan
               </button>
             </div>
           ))}
         </div>
       </section>
 
-      {/* TOTAL ORDER + RATING */}
-      <section className="px-6 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Card Ringkasan */}
+      <section className="px-6 py-8 grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="p-6 bg-[#10316B] text-white">
-          <h3 className="text-lg font-medium mb-4">Your Total Order</h3>
-          <p className="text-6xl font-bold">{totalOrder}</p>
+          <h3 className="text-lg font-medium mb-2">Total Order</h3>
+          <p className="text-5xl font-bold">{totalOrder}</p>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-green-600 text-white">
+          <h3 className="text-lg font-medium mb-2">Pekerjaan Selesai</h3>
+          <p className="text-5xl font-bold">{selesaiCount}</p>
+        </Card>
+
+        <Card className="p-6 bg-yellow-500 text-white">
+          <h3 className="text-lg font-medium mb-2">Total Penghasilan</h3>
+          <p className="text-4xl font-bold">Rp {totalPenghasilan.toLocaleString()}</p>
+        </Card>
+      </section>
+
+       <Card className="p-6 mx-5">
           <h3 className="text-lg font-medium text-[#10316B] mb-4">
             Rating dan Ulasan By User
           </h3>
@@ -150,54 +220,107 @@ export default function Teknisi() {
             </Button>
           </div>
         </Card>
-      </section>
 
-      {/* HISTORY */}
-      <section className="px-6 py-8">
-        <h2 className="text-xl font-semibold text-[#10316B] mb-4">History Pesanan Selesai</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {selesaiOrders.map((order) => (
-            <Card key={order.id} className="p-4">
-              <p className="text-lg font-medium">{order.namaBarang}</p>
-              <p className="text-sm text-gray-600">Deskripsi: {order.kondisiBarang}</p>
-              <p className="text-sm text-green-600 mt-2 font-semibold">Status: {order.statusPesanan}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-[90%] max-w-md shadow-xl">
-            <h3 className="text-xl font-semibold mb-4 text-[#10316B]">Laporan Teknisi</h3>
+      {/* Modal Selesaikan */}
+      {showSelesaikanModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-lg font-semibold mb-4">Selesaikan Pesanan</h2>
+            <label className="block mb-2 text-sm">Laporan:</label>
             <textarea
-              placeholder="Tulis laporan perbaikan..."
-              className="w-full border rounded p-2 mb-4"
+              className="w-full p-2 border rounded mb-4"
+              rows={3}
               value={laporan}
               onChange={(e) => setLaporan(e.target.value)}
-            />
+            ></textarea>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowSelesaikanModal(false);
+                  setSelectedOrderId(null);
+                }}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitLaporan}
+                className="px-4 py-2 bg-[#10316B] text-white rounded hover:bg-[#0c244d]"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ambil Pesanan */}
+      {showAmbilModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-lg font-semibold mb-4">Ambil Pesanan</h2>
+
+            <label className="block mb-2 text-sm font-medium">Estimasi Harga (Rp):</label>
             <input
               type="number"
-              placeholder="Rating (1-5)"
-              className="w-full border rounded p-2 mb-4"
-              value={rating}
-              min={1}
-              max={5}
-              onChange={(e) => setRating(Number(e.target.value))}
+              min={0}
+              className="w-full p-2 border rounded mb-4"
+              value={estimasiHarga}
+              onChange={(e) => setEstimasiHarga(e.target.value)}
+              placeholder="Masukkan estimasi harga"
             />
-            <div className="flex justify-end gap-2">
+
+            <label className="block mb-2 text-sm font-medium">Estimasi Waktu (hari):</label>
+            <input
+              type="text"
+              className="w-full p-2 border rounded mb-4"
+              value={estimasiWaktu}
+              onChange={(e) => setEstimasiWaktu(e.target.value)}
+              placeholder="Masukkan estimasi waktu pengerjaan"
+            />
+
+            <div className="flex justify-end space-x-3">
               <button
-                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowAmbilModal(false);
+                  setSelectedOrderId(null);
+                }}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
               >
                 Batal
               </button>
               <button
-                className="px-4 py-2 rounded bg-[#10316B] text-white hover:bg-blue-900"
-                onClick={handleSubmitLaporan}
+                onClick={handleConfirmAmbilPesanan}
+                className="px-4 py-2 bg-[#10316B] text-white rounded hover:bg-[#0c244d]"
               >
-                Kirim
+                Ambil Pesanan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detail */}
+      {showDetailModal && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl">
+            <h2 className="text-lg font-semibold mb-4">Detail Pesanan</h2>
+            <p><strong>Nama Barang:</strong> {selectedOrder.namaBarang}</p>
+            <p><strong>Deskripsi:</strong> {selectedOrder.kondisiBarang}</p>
+            <p><strong>Status:</strong> {selectedOrder.statusPesanan}</p>
+            {selectedOrder.estimasiHarga !== undefined && (
+              <p><strong>Estimasi Harga:</strong> Rp {selectedOrder.estimasiHarga.toLocaleString()}</p>
+            )}
+            {selectedOrder.estimasiWaktu && (
+              <p><strong>Estimasi Waktu:</strong> {selectedOrder.estimasiWaktu}</p>
+            )}
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+              >
+                Tutup
               </button>
             </div>
           </div>
