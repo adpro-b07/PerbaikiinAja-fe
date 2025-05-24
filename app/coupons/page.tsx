@@ -1,1187 +1,606 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import {
-    Loader2,
-    Filter,
-    Copy,
-    Edit,
-    Trash2,
-    Plus,
-    Search,
-    Shield,
-    Sparkles,
-    Eye,
-    Download,
-    Zap,
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { CouponAPI, type Coupon } from "@/lib/api/coupon-api";
 
-export default function AdminCouponsPage() {
-    const [coupons, setCoupons] = useState<Coupon[]>([]);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [filterStatus, setFilterStatus] = useState<string>("all");
-    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isInitialLoading, setIsInitialLoading] = useState(true);
-    const { toast } = useToast();
+interface Kupon {
+    kodeKupon: string;
+    potongan: number;
+    batasPemakaian: number;
+    jumlahPemakaian: number;
+    aktif: boolean;
+}
 
-    // Form state
+export default function CouponsPage() {
+    const [kupons, setKupons] = useState<Kupon[]>([]);
+    const [activeKupons, setActiveKupons] = useState<Kupon[]>([]);
+    const [inactiveKupons, setInactiveKupons] = useState<Kupon[]>([]);
+    const [totalKupons, setTotalKupons] = useState(0);
+    const [activeCount, setActiveCount] = useState(0);
+    const [inactiveCount, setInactiveCount] = useState(0);
+
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+    const [selectedKupon, setSelectedKupon] = useState<Kupon | null>(null);
     const [formData, setFormData] = useState({
-        name: "",
-        description: "",
-        discountType: "percentage" as "percentage" | "fixed",
-        discountValue: 0,
-        maxUsage: 0,
-        minOrderAmount: 0,
-        expiryDate: "",
-        isActive: true,
+        kodeKupon: "",
+        potongan: "",
+        batasPemakaian: "",
     });
 
-    // Load coupons from API on component mount
+    // Fetch semua kupon
+    const fetchAllKupons = async () => {
+        try {
+            const response = await fetch("/api/kupon");
+            const data: Kupon[] = await response.json();
+            setKupons(data);
+            setTotalKupons(data.length);
+        } catch (error) {
+            console.error("Error fetching all kupons:", error);
+        }
+    };
+
+    // Fetch kupon aktif
+    const fetchActiveKupons = async () => {
+        try {
+            const response = await fetch("/api/kupon/active");
+            const data: Kupon[] = await response.json();
+            setActiveKupons(data);
+            setActiveCount(data.length);
+        } catch (error) {
+            console.error("Error fetching active kupons:", error);
+        }
+    };
+
+    // Fetch kupon tidak aktif
+    const fetchInactiveKupons = async () => {
+        try {
+            const response = await fetch("/api/kupon/inactive");
+            const data: Kupon[] = await response.json();
+            setInactiveKupons(data);
+            setInactiveCount(data.length);
+        } catch (error) {
+            console.error("Error fetching inactive kupons:", error);
+        }
+    };
+
     useEffect(() => {
-        loadCoupons();
+        fetchAllKupons();
+        fetchActiveKupons();
+        fetchInactiveKupons();
     }, []);
 
-    // Load coupons from backend
-    const loadCoupons = async () => {
+    // Handle create kupon
+    const handleCreateKupon = async () => {
+        if (
+            !formData.kodeKupon ||
+            !formData.potongan ||
+            !formData.batasPemakaian
+        ) {
+            alert("Mohon isi semua field!");
+            return;
+        }
+
         try {
-            setIsInitialLoading(true);
-            const fetchedCoupons = await CouponAPI.getAllCoupons();
-            setCoupons(fetchedCoupons);
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Gagal memuat data kupon",
-                variant: "destructive",
+            const response = await fetch("/api/kupon/create", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    kodeKupon: formData.kodeKupon,
+                    potongan: parseInt(formData.potongan),
+                    batasPemakaian: parseInt(formData.batasPemakaian),
+                }),
             });
-            console.error("Error loading coupons:", error);
-        } finally {
-            setIsInitialLoading(false);
+
+            if (response.ok) {
+                alert("Kupon berhasil dibuat!");
+                setShowCreateModal(false);
+                setFormData({
+                    kodeKupon: "",
+                    potongan: "",
+                    batasPemakaian: "",
+                });
+                fetchAllKupons();
+                fetchActiveKupons();
+            } else {
+                alert("Gagal membuat kupon. Kode kupon mungkin sudah ada.");
+            }
+        } catch (error) {
+            console.error("Error creating kupon:", error);
+            alert("Error membuat kupon");
         }
     };
 
-    // Generate random coupon code
-    const generateCouponCode = () => {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let result = "";
-        for (let i = 0; i < 8; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
+    // Handle update kupon
+    const handleUpdateKupon = async () => {
+        if (!selectedKupon || !formData.potongan || !formData.batasPemakaian) {
+            alert("Mohon isi semua field!");
+            return;
         }
-        return result;
+
+        try {
+            const response = await fetch(
+                `/api/kupon/update/${selectedKupon.kodeKupon}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        potongan: parseInt(formData.potongan),
+                        batasPemakaian: parseInt(formData.batasPemakaian),
+                    }),
+                }
+            );
+
+            if (response.ok) {
+                alert("Kupon berhasil diupdate!");
+                setShowUpdateModal(false);
+                setSelectedKupon(null);
+                setFormData({
+                    kodeKupon: "",
+                    potongan: "",
+                    batasPemakaian: "",
+                });
+                fetchAllKupons();
+                fetchActiveKupons();
+                fetchInactiveKupons();
+            } else {
+                alert("Gagal mengupdate kupon.");
+            }
+        } catch (error) {
+            console.error("Error updating kupon:", error);
+            alert("Error mengupdate kupon");
+        }
     };
 
-    // Filter coupons
-    const filteredCoupons = coupons.filter((coupon) => {
-        const matchesSearch =
-            coupon.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            coupon.code.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesFilter =
-            filterStatus === "all" ||
-            (filterStatus === "active" && coupon.isActive) ||
-            (filterStatus === "inactive" && !coupon.isActive) ||
-            (filterStatus === "expired" &&
-                new Date(coupon.expiryDate) < new Date());
-        return matchesSearch && matchesFilter;
-    });
+    // Handle delete kupon
+    const handleDeleteKupon = async () => {
+        if (!selectedKupon) return;
 
-    // Reset form
-    const resetForm = () => {
+        try {
+            const response = await fetch(
+                `/api/kupon/delete/${selectedKupon.kodeKupon}`,
+                {
+                    method: "DELETE",
+                }
+            );
+
+            if (response.ok) {
+                alert("Kupon berhasil dihapus!");
+                setShowDeleteModal(false);
+                setSelectedKupon(null);
+                fetchAllKupons();
+                fetchActiveKupons();
+                fetchInactiveKupons();
+            } else {
+                alert("Gagal menghapus kupon.");
+            }
+        } catch (error) {
+            console.error("Error deleting kupon:", error);
+            alert("Error menghapus kupon");
+        }
+    };
+
+    // Handle open modals
+    const handleOpenCreateModal = () => {
+        setFormData({ kodeKupon: "", potongan: "", batasPemakaian: "" });
+        setShowCreateModal(true);
+    };
+
+    const handleOpenUpdateModal = (kupon: Kupon) => {
+        setSelectedKupon(kupon);
         setFormData({
-            name: "",
-            description: "",
-            discountType: "percentage",
-            discountValue: 0,
-            maxUsage: 0,
-            minOrderAmount: 0,
-            expiryDate: "",
-            isActive: true,
+            kodeKupon: kupon.kodeKupon,
+            potongan: kupon.potongan.toString(),
+            batasPemakaian: kupon.batasPemakaian.toString(),
         });
+        setShowUpdateModal(true);
     };
 
-    // Handle create coupon
-    const handleCreateCoupon = async () => {
-        setIsLoading(true);
-        try {
-            // Validasi input yang diperlukan backend
-            if (!formData.discountValue || formData.discountValue <= 0) {
-                toast({
-                    title: "Error",
-                    description: "Nilai diskon harus lebih besar dari 0",
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            if (!formData.maxUsage || formData.maxUsage <= 0) {
-                toast({
-                    title: "Error",
-                    description: "Maksimal penggunaan harus lebih besar dari 0",
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            const newCouponData = {
-                code: generateCouponCode(), // Generate kode kupon
-                discountValue: formData.discountValue, // akan di-map ke 'potongan'
-                maxUsage: formData.maxUsage, // akan di-map ke 'batasPemakaian'
-                // Field lain tidak dikirim ke backend karena tidak diperlukan
-                name: formData.name || `Kupon ${formData.discountValue}%`,
-                description:
-                    formData.description ||
-                    `Kupon diskon ${formData.discountValue}%`,
-                discountType: formData.discountType,
-                minOrderAmount: formData.minOrderAmount,
-                expiryDate: formData.expiryDate,
-                isActive: formData.isActive,
-            };
-
-            const newCoupon = await CouponAPI.createCoupon(newCouponData);
-            setCoupons([...coupons, newCoupon]);
-            setIsCreateDialogOpen(false);
-            resetForm();
-            toast({
-                title: "Sukses",
-                description: `Kupon berhasil dibuat! Kode kupon: ${newCoupon.code}`,
-            });
-        } catch (error) {
-            console.error("Create coupon error:", error);
-            toast({
-                title: "Error",
-                description:
-                    error instanceof Error
-                        ? error.message
-                        : "Gagal membuat kupon",
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
+    const handleOpenDetailModal = (kupon: Kupon) => {
+        setSelectedKupon(kupon);
+        setShowDetailModal(true);
     };
 
-    // Handle edit coupon
-    const handleEditCoupon = async () => {
-        if (!selectedCoupon) return;
-
-        setIsLoading(true);
-        try {
-            // Validasi input yang diperlukan backend
-            if (!formData.discountValue || formData.discountValue <= 0) {
-                toast({
-                    title: "Error",
-                    description: "Nilai diskon harus lebih besar dari 0",
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            if (!formData.maxUsage || formData.maxUsage <= 0) {
-                toast({
-                    title: "Error",
-                    description: "Maksimal penggunaan harus lebih besar dari 0",
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            const updateData = {
-                discountValue: formData.discountValue, // akan di-map ke 'potongan'
-                maxUsage: formData.maxUsage, // akan di-map ke 'batasPemakaian'
-                // Field lain tidak dikirim ke backend
-                name: formData.name,
-                description: formData.description,
-                discountType: formData.discountType,
-                minOrderAmount: formData.minOrderAmount,
-                expiryDate: formData.expiryDate,
-                isActive: formData.isActive,
-            };
-
-            const updatedCoupon = await CouponAPI.updateCoupon(
-                selectedCoupon.code,
-                updateData
-            );
-
-            const updatedCoupons = coupons.map((coupon) =>
-                coupon.id === selectedCoupon.id ? updatedCoupon : coupon
-            );
-
-            setCoupons(updatedCoupons);
-            setIsEditDialogOpen(false);
-            setSelectedCoupon(null);
-            resetForm();
-            toast({
-                title: "Sukses",
-                description: "Kupon berhasil diperbarui!",
-            });
-        } catch (error) {
-            console.error("Update coupon error:", error);
-            toast({
-                title: "Error",
-                description:
-                    error instanceof Error
-                        ? error.message
-                        : "Gagal memperbarui kupon",
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
+    const handleOpenDeleteModal = (kupon: Kupon) => {
+        setSelectedKupon(kupon);
+        setShowDeleteModal(true);
     };
-
-    // Handle delete coupon
-    const handleDeleteCoupon = async (couponCode: string) => {
-        setIsLoading(true);
-        try {
-            await CouponAPI.deleteCoupon(couponCode);
-            setCoupons(coupons.filter((coupon) => coupon.code !== couponCode));
-            toast({
-                title: "Sukses",
-                description: "Kupon berhasil dihapus!",
-            });
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Gagal menghapus kupon",
-                variant: "destructive",
-            });
-            console.error("Error deleting coupon:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Open edit dialog
-    const openEditDialog = (coupon: Coupon) => {
-        setSelectedCoupon(coupon);
-        setFormData({
-            name: coupon.name,
-            description: coupon.description,
-            discountType: coupon.discountType,
-            discountValue: coupon.discountValue,
-            maxUsage: coupon.maxUsage,
-            minOrderAmount: coupon.minOrderAmount,
-            expiryDate: coupon.expiryDate,
-            isActive: coupon.isActive,
-        });
-        setIsEditDialogOpen(true);
-    };
-
-    // Copy coupon code
-    const copyCouponCode = (code: string) => {
-        navigator.clipboard.writeText(code);
-        toast({
-            title: "Sukses",
-            description: "Kode kupon disalin!",
-        });
-    };
-
-    // Get status badge
-    const getStatusBadge = (coupon: Coupon) => {
-        const isExpired = new Date(coupon.expiryDate) < new Date();
-        const isFullyUsed = coupon.currentUsage >= coupon.maxUsage;
-
-        if (isExpired) {
-            return (
-                <Badge
-                    variant="destructive"
-                    className="bg-red-500/20 text-red-400 border-red-500/30"
-                >
-                    Kedaluwarsa
-                </Badge>
-            );
-        }
-        if (isFullyUsed) {
-            return (
-                <Badge
-                    variant="secondary"
-                    className="bg-gray-500/20 text-gray-400 border-gray-500/30"
-                >
-                    Habis
-                </Badge>
-            );
-        }
-        if (coupon.isActive) {
-            return (
-                <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                    Aktif
-                </Badge>
-            );
-        }
-        return (
-            <Badge
-                variant="outline"
-                className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-            >
-                Nonaktif
-            </Badge>
-        );
-    };
-
-    // Show loading spinner during initial load
-    if (isInitialLoading) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-                <div className="flex items-center gap-3">
-                    <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
-                    <span className="text-xl text-white">
-                        Memuat data kupon...
-                    </span>
-                </div>
-            </div>
-        );
-    }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                            <Shield className="h-8 w-8 text-purple-400" />
-                            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                                Manajemen Kupon
-                            </h1>
-                        </div>
-                        <p className="text-slate-400">
+        <main className="min-h-screen bg-white">
+            {/* Header */}
+            <section className="px-6 py-8 bg-[#10316B] text-white">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold mb-2">
+                            Manajemen Kupon
+                        </h1>
+                        <p className="text-blue-100">
                             Kelola kupon diskon untuk pelanggan
                         </p>
                     </div>
-
-                    <Dialog
-                        open={isCreateDialogOpen}
-                        onOpenChange={setIsCreateDialogOpen}
+                    <Button
+                        onClick={handleOpenCreateModal}
+                        className="bg-white text-[#10316B] hover:bg-gray-100"
                     >
-                        <DialogTrigger asChild>
-                            <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0">
-                                <Plus className="h-4 w-4 mr-2" />
-                                Buat Kupon Baru
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl">
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <Sparkles className="h-5 w-5 text-purple-400" />
-                                    Buat Kupon Baru
-                                </DialogTitle>
-                                <DialogDescription className="text-slate-400">
-                                    Buat kupon diskon baru. Kode kupon akan
-                                    dibuat otomatis.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name">Nama Kupon</Label>
-                                        <Input
-                                            id="name"
-                                            value={formData.name}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    name: e.target.value,
-                                                })
-                                            }
-                                            className="bg-slate-800 border-slate-600"
-                                            placeholder="Masukkan nama kupon"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="discountType">
-                                            Jenis Diskon
-                                        </Label>
-                                        <Select
-                                            value={formData.discountType}
-                                            onValueChange={(
-                                                value: "percentage" | "fixed"
-                                            ) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    discountType: value,
-                                                })
-                                            }
-                                        >
-                                            <SelectTrigger className="bg-slate-800 border-slate-600">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-slate-800 border-slate-600">
-                                                <SelectItem value="percentage">
-                                                    Persentase (%)
-                                                </SelectItem>
-                                                <SelectItem value="fixed">
-                                                    Nominal (Rp)
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">
-                                        Deskripsi
-                                    </Label>
-                                    <Textarea
-                                        id="description"
-                                        value={formData.description}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                description: e.target.value,
-                                            })
-                                        }
-                                        className="bg-slate-800 border-slate-600"
-                                        placeholder="Deskripsi kupon"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="discountValue">
-                                            Nilai Diskon{" "}
-                                            {formData.discountType ===
-                                            "percentage"
-                                                ? "(%)"
-                                                : "(Rp)"}
-                                        </Label>
-                                        <Input
-                                            id="discountValue"
-                                            type="number"
-                                            value={formData.discountValue}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    discountValue: Number(
-                                                        e.target.value
-                                                    ),
-                                                })
-                                            }
-                                            className="bg-slate-800 border-slate-600"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="maxUsage">
-                                            Maksimal Penggunaan
-                                        </Label>
-                                        <Input
-                                            id="maxUsage"
-                                            type="number"
-                                            value={formData.maxUsage}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    maxUsage: Number(
-                                                        e.target.value
-                                                    ),
-                                                })
-                                            }
-                                            className="bg-slate-800 border-slate-600"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="minOrderAmount">
-                                            Minimal Pembelian (Rp)
-                                        </Label>
-                                        <Input
-                                            id="minOrderAmount"
-                                            type="number"
-                                            value={formData.minOrderAmount}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    minOrderAmount: Number(
-                                                        e.target.value
-                                                    ),
-                                                })
-                                            }
-                                            className="bg-slate-800 border-slate-600"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="expiryDate">
-                                            Tanggal Kedaluwarsa
-                                        </Label>
-                                        <Input
-                                            id="expiryDate"
-                                            type="date"
-                                            value={formData.expiryDate}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    expiryDate: e.target.value,
-                                                })
-                                            }
-                                            className="bg-slate-800 border-slate-600"
-                                        />
-                                    </div>
-                                </div>{" "}
-                                <div className="flex items-center space-x-2">
-                                    <Switch
-                                        id="isActive"
-                                        checked={formData.isActive}
-                                        onCheckedChange={(checked) =>
-                                            setFormData({
-                                                ...formData,
-                                                isActive: checked,
-                                            })
-                                        }
-                                    />
-                                    <Label
-                                        htmlFor="isActive"
-                                        className="text-white font-medium"
-                                    >
-                                        Aktifkan kupon
-                                    </Label>
-                                </div>
-                            </div>{" "}
-                            <DialogFooter>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsCreateDialogOpen(false)}
-                                    className="border-slate-600 text-slate-200 hover:text-white hover:bg-slate-700"
-                                >
-                                    Batal
-                                </Button>
-                                <Button
-                                    onClick={handleCreateCoupon}
-                                    disabled={isLoading}
-                                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                                >
-                                    {isLoading ? (
-                                        <>
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                            Membuat...
-                                        </>
-                                    ) : (
-                                        "Buat Kupon"
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                        + Buat Kupon Baru
+                    </Button>
                 </div>
+            </section>
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-400">
-                                        Total Kupon
-                                    </p>
-                                    <p className="text-2xl font-bold text-white">
-                                        {coupons.length}
-                                    </p>
-                                </div>
-                                <Zap className="h-8 w-8 text-purple-400" />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-400">
-                                        Kupon Aktif
-                                    </p>
-                                    <p className="text-2xl font-bold text-green-400">
-                                        {
-                                            coupons.filter((c) => c.isActive)
-                                                .length
-                                        }
-                                    </p>
-                                </div>
-                                <Sparkles className="h-8 w-8 text-green-400" />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-400">
-                                        Total Penggunaan
-                                    </p>
-                                    <p className="text-2xl font-bold text-blue-400">
-                                        {coupons.reduce(
-                                            (sum, c) => sum + c.currentUsage,
-                                            0
-                                        )}
-                                    </p>
-                                </div>
-                                <Eye className="h-8 w-8 text-blue-400" />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-400">
-                                        Kedaluwarsa
-                                    </p>
-                                    <p className="text-2xl font-bold text-red-400">
-                                        {
-                                            coupons.filter(
-                                                (c) =>
-                                                    new Date(c.expiryDate) <
-                                                    new Date()
-                                            ).length
-                                        }
-                                    </p>
-                                </div>
-                                <Trash2 className="h-8 w-8 text-red-400" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Filters */}
-                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-                    <CardContent className="p-6">
-                        <div className="flex flex-col md:flex-row gap-4">
-                            <div className="flex-1">
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                                    <Input
-                                        placeholder="Cari kupon..."
-                                        value={searchTerm}
-                                        onChange={(e) =>
-                                            setSearchTerm(e.target.value)
-                                        }
-                                        className="pl-10 bg-slate-700 border-slate-600"
-                                    />
-                                </div>
-                            </div>
-                            <Select
-                                value={filterStatus}
-                                onValueChange={setFilterStatus}
-                            >
-                                <SelectTrigger className="w-full md:w-48 bg-slate-700 border-slate-600">
-                                    <Filter className="h-4 w-4 mr-2" />
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="bg-slate-800 border-slate-600">
-                                    <SelectItem value="all">
-                                        Semua Status
-                                    </SelectItem>
-                                    <SelectItem value="active">
-                                        Aktif
-                                    </SelectItem>
-                                    <SelectItem value="inactive">
-                                        Nonaktif
-                                    </SelectItem>
-                                    <SelectItem value="expired">
-                                        Kedaluwarsa
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button
-                                variant="outline"
-                                className="border-slate-600 hover:border-slate-500"
-                                onClick={loadCoupons}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Refresh
-                            </Button>
-                        </div>
-                    </CardContent>
+            {/* Stats Cards */}
+            <section className="px-6 py-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="p-6 bg-[#10316B] text-white">
+                    <h3 className="text-lg font-medium mb-2">Total Kupon</h3>
+                    <p className="text-5xl font-bold">{totalKupons}</p>
                 </Card>
 
-                {/* Coupons Table */}
-                <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-                    <CardHeader>
-                        <CardTitle className="text-white">
-                            Daftar Kupon
-                        </CardTitle>
-                        <CardDescription className="text-slate-400">
-                            Kelola semua kupon diskon Anda di sini
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="border-slate-700">
-                                        <TableHead className="text-slate-300">
-                                            Kode
-                                        </TableHead>
-                                        <TableHead className="text-slate-300">
-                                            Nama
-                                        </TableHead>
-                                        <TableHead className="text-slate-300">
-                                            Diskon
-                                        </TableHead>
-                                        <TableHead className="text-slate-300">
-                                            Penggunaan
-                                        </TableHead>
-                                        <TableHead className="text-slate-300">
-                                            Min. Pembelian
-                                        </TableHead>
-                                        <TableHead className="text-slate-300">
-                                            Kedaluwarsa
-                                        </TableHead>
-                                        <TableHead className="text-slate-300">
-                                            Status
-                                        </TableHead>
-                                        <TableHead className="text-slate-300">
-                                            Aksi
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredCoupons.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={8}
-                                                className="text-center py-10 text-slate-400"
-                                            >
-                                                {searchTerm ||
-                                                filterStatus !== "all"
-                                                    ? "Tidak ada kupon yang sesuai dengan kriteria pencarian"
-                                                    : "Belum ada kupon tersedia"}
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        filteredCoupons.map((coupon) => (
-                                            <TableRow
-                                                key={coupon.id}
-                                                className="border-slate-700"
-                                            >
-                                                <TableCell className="font-mono">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-purple-400">
-                                                            {coupon.code}
-                                                        </span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                copyCouponCode(
-                                                                    coupon.code
-                                                                )
-                                                            }
-                                                            className="h-6 w-6 p-0"
-                                                        >
-                                                            <Copy className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div>
-                                                        <p className="font-medium text-white">
-                                                            {coupon.name}
-                                                        </p>
-                                                        <p className="text-sm text-slate-400">
-                                                            {coupon.description}
-                                                        </p>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-green-400">
-                                                        {coupon.discountType ===
-                                                        "percentage"
-                                                            ? `${coupon.discountValue}%`
-                                                            : `Rp ${coupon.discountValue.toLocaleString()}`}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-white">
-                                                                {
-                                                                    coupon.currentUsage
-                                                                }
-                                                            </span>
-                                                            <span className="text-slate-400">
-                                                                /
-                                                            </span>
-                                                            <span className="text-slate-400">
-                                                                {
-                                                                    coupon.maxUsage
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                        <div className="w-full bg-slate-700 rounded-full h-2">
-                                                            <div
-                                                                className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full"
-                                                                style={{
-                                                                    width: `${
-                                                                        (coupon.currentUsage /
-                                                                            coupon.maxUsage) *
-                                                                        100
-                                                                    }%`,
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-slate-300">
-                                                    Rp{" "}
-                                                    {coupon.minOrderAmount.toLocaleString()}
-                                                </TableCell>
-                                                <TableCell className="text-slate-300">
-                                                    {new Date(
-                                                        coupon.expiryDate
-                                                    ).toLocaleDateString(
-                                                        "id-ID"
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {getStatusBadge(coupon)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                openEditDialog(
-                                                                    coupon
-                                                                )
-                                                            }
-                                                            className="h-8 w-8 p-0 text-blue-400 hover:text-blue-300"
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                        </Button>
-
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger
-                                                                asChild
-                                                            >
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-8 w-8 p-0 text-red-400 hover:text-red-300"
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent className="bg-slate-900 border-slate-700">
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle className="text-white">
-                                                                        Hapus
-                                                                        Kupon
-                                                                    </AlertDialogTitle>
-                                                                    <AlertDialogDescription className="text-slate-400">
-                                                                        Apakah
-                                                                        Anda
-                                                                        yakin
-                                                                        ingin
-                                                                        menghapus
-                                                                        kupon "
-                                                                        {
-                                                                            coupon.name
-                                                                        }
-                                                                        "?
-                                                                        Tindakan
-                                                                        ini
-                                                                        tidak
-                                                                        dapat
-                                                                        dibatalkan.
-                                                                    </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel className="border-slate-600">
-                                                                        Batal
-                                                                    </AlertDialogCancel>
-                                                                    <AlertDialogAction
-                                                                        onClick={() =>
-                                                                            handleDeleteCoupon(
-                                                                                coupon.code
-                                                                            )
-                                                                        }
-                                                                        className="bg-red-600 hover:bg-red-700"
-                                                                    >
-                                                                        {isLoading ? (
-                                                                            <>
-                                                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                                                Menghapus...
-                                                                            </>
-                                                                        ) : (
-                                                                            "Hapus"
-                                                                        )}
-                                                                    </AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
+                <Card className="p-6 bg-green-600 text-white">
+                    <h3 className="text-lg font-medium mb-2">Kupon Aktif</h3>
+                    <p className="text-5xl font-bold">{activeCount}</p>
                 </Card>
 
-                {/* Edit Dialog */}
-                <Dialog
-                    open={isEditDialogOpen}
-                    onOpenChange={setIsEditDialogOpen}
-                >
-                    <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <Edit className="h-5 w-5 text-blue-400" />
-                                Edit Kupon
-                            </DialogTitle>
-                            <DialogDescription className="text-slate-400">
-                                Perbarui informasi kupon. Kode kupon tidak dapat
-                                diubah.
-                            </DialogDescription>
-                        </DialogHeader>
+                <Card className="p-6 bg-red-600 text-white">
+                    <h3 className="text-lg font-medium mb-2">Kupon Nonaktif</h3>
+                    <p className="text-5xl font-bold">{inactiveCount}</p>
+                </Card>
+            </section>
 
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit-name">
-                                        Nama Kupon
-                                    </Label>
-                                    <Input
-                                        id="edit-name"
-                                        value={formData.name}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                name: e.target.value,
-                                            })
-                                        }
-                                        className="bg-slate-800 border-slate-600"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit-discountType">
-                                        Jenis Diskon
-                                    </Label>
-                                    <Select
-                                        value={formData.discountType}
-                                        onValueChange={(
-                                            value: "percentage" | "fixed"
-                                        ) =>
-                                            setFormData({
-                                                ...formData,
-                                                discountType: value,
-                                            })
-                                        }
-                                    >
-                                        <SelectTrigger className="bg-slate-800 border-slate-600">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-slate-800 border-slate-600">
-                                            <SelectItem value="percentage">
-                                                Persentase (%)
-                                            </SelectItem>
-                                            <SelectItem value="fixed">
-                                                Nominal (Rp)
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+            {/* Kupon List */}
+            <section className="px-6 py-8">
+                <h2 className="text-xl font-semibold text-[#10316B] mb-4">
+                    Daftar Semua Kupon
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {kupons.map((kupon) => (
+                        <Card
+                            key={kupon.kodeKupon}
+                            className="p-4 border-2 hover:shadow-lg transition-shadow"
+                        >
+                            <div className="flex justify-between items-start mb-3">
+                                <h3 className="text-lg font-bold text-[#10316B]">
+                                    {kupon.kodeKupon}
+                                </h3>
+                                <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        kupon.aktif
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-red-100 text-red-800"
+                                    }`}
+                                >
+                                    {kupon.aktif ? "Aktif" : "Nonaktif"}
+                                </span>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="edit-description">
-                                    Deskripsi
-                                </Label>
-                                <Textarea
-                                    id="edit-description"
-                                    value={formData.description}
+                            <div className="space-y-2 mb-4">
+                                <p className="text-sm">
+                                    <span className="font-medium">
+                                        Potongan:
+                                    </span>{" "}
+                                    Rp {kupon.potongan.toLocaleString()}
+                                </p>
+                                <p className="text-sm">
+                                    <span className="font-medium">
+                                        Batas Pemakaian:
+                                    </span>{" "}
+                                    {kupon.batasPemakaian}x
+                                </p>
+                                <p className="text-sm">
+                                    <span className="font-medium">
+                                        Sudah Digunakan:
+                                    </span>{" "}
+                                    {kupon.jumlahPemakaian || 0}x
+                                </p>
+                            </div>
+
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={() => handleOpenDetailModal(kupon)}
+                                    className="flex-1 py-2 text-sm border rounded-lg hover:bg-gray-50"
+                                >
+                                    Detail
+                                </button>
+                                <button
+                                    onClick={() => handleOpenUpdateModal(kupon)}
+                                    className="flex-1 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    onClick={() => handleOpenDeleteModal(kupon)}
+                                    className="flex-1 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                >
+                                    Hapus
+                                </button>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+
+                {kupons.length === 0 && (
+                    <div className="text-center py-12">
+                        <p className="text-gray-500 text-lg">
+                            Belum ada kupon yang dibuat
+                        </p>
+                        <Button
+                            onClick={handleOpenCreateModal}
+                            className="mt-4 bg-[#10316B] hover:bg-[#0c244d]"
+                        >
+                            Buat Kupon Pertama
+                        </Button>
+                    </div>
+                )}
+            </section>
+
+            {/* Modal Create Kupon */}
+            {showCreateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+                        <h2 className="text-lg font-semibold mb-4">
+                            Buat Kupon Baru
+                        </h2>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block mb-2 text-sm font-medium">
+                                    Kode Kupon:
+                                </label>
+                                <input
+                                    type="text"
+                                    className="w-full p-2 border rounded"
+                                    value={formData.kodeKupon}
                                     onChange={(e) =>
                                         setFormData({
                                             ...formData,
-                                            description: e.target.value,
+                                            kodeKupon: e.target.value,
                                         })
                                     }
-                                    className="bg-slate-800 border-slate-600"
+                                    placeholder="Masukkan kode kupon"
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit-discountValue">
-                                        Nilai Diskon{" "}
-                                        {formData.discountType === "percentage"
-                                            ? "(%)"
-                                            : "(Rp)"}
-                                    </Label>
-                                    <Input
-                                        id="edit-discountValue"
-                                        type="number"
-                                        value={formData.discountValue}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                discountValue: Number(
-                                                    e.target.value
-                                                ),
-                                            })
-                                        }
-                                        className="bg-slate-800 border-slate-600"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit-maxUsage">
-                                        Maksimal Penggunaan
-                                    </Label>
-                                    <Input
-                                        id="edit-maxUsage"
-                                        type="number"
-                                        value={formData.maxUsage}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                maxUsage: Number(
-                                                    e.target.value
-                                                ),
-                                            })
-                                        }
-                                        className="bg-slate-800 border-slate-600"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit-minOrderAmount">
-                                        Minimal Pembelian (Rp)
-                                    </Label>
-                                    <Input
-                                        id="edit-minOrderAmount"
-                                        type="number"
-                                        value={formData.minOrderAmount}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                minOrderAmount: Number(
-                                                    e.target.value
-                                                ),
-                                            })
-                                        }
-                                        className="bg-slate-800 border-slate-600"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit-expiryDate">
-                                        Tanggal Kedaluwarsa
-                                    </Label>
-                                    <Input
-                                        id="edit-expiryDate"
-                                        type="date"
-                                        value={formData.expiryDate}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                expiryDate: e.target.value,
-                                            })
-                                        }
-                                        className="bg-slate-800 border-slate-600"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                                <Switch
-                                    id="edit-isActive"
-                                    checked={formData.isActive}
-                                    onCheckedChange={(checked) =>
+                            <div>
+                                <label className="block mb-2 text-sm font-medium">
+                                    Potongan Harga (Rp):
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full p-2 border rounded"
+                                    value={formData.potongan}
+                                    onChange={(e) =>
                                         setFormData({
                                             ...formData,
-                                            isActive: checked,
+                                            potongan: e.target.value,
                                         })
                                     }
-                                />{" "}
-                                <Label
-                                    htmlFor="edit-isActive"
-                                    className="text-white font-medium"
-                                >
-                                    Aktifkan kupon
-                                </Label>
+                                    placeholder="Masukkan jumlah potongan"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block mb-2 text-sm font-medium">
+                                    Batas Pemakaian:
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full p-2 border rounded"
+                                    value={formData.batasPemakaian}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            batasPemakaian: e.target.value,
+                                        })
+                                    }
+                                    placeholder="Maksimal berapa kali bisa digunakan"
+                                />
                             </div>
                         </div>
 
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                onClick={() => setIsEditDialogOpen(false)}
-                                className="border-slate-600 text-slate-200 hover:text-white hover:bg-slate-700"
+                        <div className="flex justify-end space-x-3 mt-6">
+                            <button
+                                onClick={() => setShowCreateModal(false)}
+                                className="px-4 py-2 border rounded hover:bg-gray-100"
                             >
                                 Batal
-                            </Button>
-                            <Button
-                                onClick={handleEditCoupon}
-                                disabled={isLoading}
-                                className="bg-gradient-to-r from-blue-600 to-purple-600"
+                            </button>
+                            <button
+                                onClick={handleCreateKupon}
+                                className="px-4 py-2 bg-[#10316B] text-white rounded hover:bg-[#0c244d]"
                             >
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        Menyimpan...
-                                    </>
-                                ) : (
-                                    "Simpan Perubahan"
-                                )}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
-        </div>
+                                Buat Kupon
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Update Kupon */}
+            {showUpdateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+                        <h2 className="text-lg font-semibold mb-4">
+                            Edit Kupon
+                        </h2>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block mb-2 text-sm font-medium">
+                                    Kode Kupon:
+                                </label>
+                                <input
+                                    type="text"
+                                    className="w-full p-2 border rounded bg-gray-100"
+                                    value={formData.kodeKupon}
+                                    disabled
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Kode kupon tidak bisa diubah
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block mb-2 text-sm font-medium">
+                                    Potongan Harga (Rp):
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full p-2 border rounded"
+                                    value={formData.potongan}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            potongan: e.target.value,
+                                        })
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block mb-2 text-sm font-medium">
+                                    Batas Pemakaian:
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full p-2 border rounded"
+                                    value={formData.batasPemakaian}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            batasPemakaian: e.target.value,
+                                        })
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end space-x-3 mt-6">
+                            <button
+                                onClick={() => setShowUpdateModal(false)}
+                                className="px-4 py-2 border rounded hover:bg-gray-100"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleUpdateKupon}
+                                className="px-4 py-2 bg-[#10316B] text-white rounded hover:bg-[#0c244d]"
+                            >
+                                Update Kupon
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Detail Kupon */}
+            {showDetailModal && selectedKupon && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+                    <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl">
+                        <h2 className="text-lg font-semibold mb-4">
+                            Detail Kupon
+                        </h2>
+
+                        <div className="space-y-3">
+                            <div>
+                                <span className="font-medium">Kode Kupon:</span>
+                                <p className="text-lg font-bold text-[#10316B]">
+                                    {selectedKupon.kodeKupon}
+                                </p>
+                            </div>
+
+                            <div>
+                                <span className="font-medium">
+                                    Potongan Harga:
+                                </span>
+                                <p>
+                                    Rp {selectedKupon.potongan.toLocaleString()}
+                                </p>
+                            </div>
+
+                            <div>
+                                <span className="font-medium">
+                                    Batas Pemakaian:
+                                </span>
+                                <p>{selectedKupon.batasPemakaian}x</p>
+                            </div>
+
+                            <div>
+                                <span className="font-medium">
+                                    Sudah Digunakan:
+                                </span>
+                                <p>{selectedKupon.jumlahPemakaian || 0}x</p>
+                            </div>
+
+                            <div>
+                                <span className="font-medium">Status:</span>
+                                <span
+                                    className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                                        selectedKupon.aktif
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-red-100 text-red-800"
+                                    }`}
+                                >
+                                    {selectedKupon.aktif ? "Aktif" : "Nonaktif"}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end mt-6">
+                            <button
+                                onClick={() => setShowDetailModal(false)}
+                                className="px-4 py-2 border rounded hover:bg-gray-100"
+                            >
+                                Tutup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Delete Confirmation */}
+            {showDeleteModal && selectedKupon && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+                    <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl">
+                        <h2 className="text-lg font-semibold mb-4 text-red-600">
+                            Konfirmasi Hapus
+                        </h2>
+                        <p className="mb-4">
+                            Apakah Anda yakin ingin menghapus kupon{" "}
+                            <strong>{selectedKupon.kodeKupon}</strong>?
+                        </p>
+                        <p className="text-sm text-gray-600 mb-6">
+                            Tindakan ini tidak dapat dibatalkan.
+                        </p>
+
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                className="px-4 py-2 border rounded hover:bg-gray-100"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleDeleteKupon}
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                                Hapus Kupon
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </main>
     );
 }
