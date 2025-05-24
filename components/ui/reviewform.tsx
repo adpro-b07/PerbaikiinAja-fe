@@ -61,6 +61,7 @@ export default function ReviewForm({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
+        credentials: 'include'
       })
       
       if (!response.ok) {
@@ -71,7 +72,6 @@ export default function ReviewForm({
         onSuccess()
       }
     } catch (err) {
-      console.error('Error submitting review:', err)
       setError('Gagal mengirim ulasan. Silakan coba lagi.')
     } finally {
       setIsSubmitting(false)

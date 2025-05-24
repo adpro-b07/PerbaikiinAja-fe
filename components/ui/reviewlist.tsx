@@ -39,23 +39,29 @@ export default function ReviewList({
           endpoint = `/api/report/teknisi/${encodeURIComponent(teknisiEmail)}`
         }
         
-        const response = await fetch(endpoint)
+        const response = await fetch(endpoint, {
+          credentials: 'include' 
+        })
+        
         
         if (!response.ok) {
-          throw new Error('Failed to fetch reviews')
+          throw new Error(`Failed to fetch reviews: ${response.status}`)
         }
         
         const data = await response.json()
         setReports(Array.isArray(data) ? data : [])
       } catch (err) {
-        console.error('Error fetching reports:', err)
         setError('Gagal memuat ulasan')
       } finally {
         setLoading(false)
       }
     }
     
-    fetchReports()
+    if (userEmail || teknisiEmail) {
+      fetchReports()
+    } else {
+      setLoading(false)
+    }
   }, [userEmail, teknisiEmail])
   
   if (loading) {

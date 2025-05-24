@@ -14,7 +14,7 @@ export default function ReviewPage() {
   const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  
+  const [initialReview, setInitialReview] = useState<any>(null)
   const idPesanan = searchParams.get('id')
   const mode = searchParams.get('mode') || 'create'
   
@@ -35,6 +35,33 @@ export default function ReviewPage() {
     }
   }, [router])
   
+  useEffect(() => {
+  // Fetch existing review data when in edit mode
+  const fetchReviewData = async () => {
+    if (idPesanan && mode === 'edit') {
+      try {
+        const res = await fetch(`/api/report/get/${idPesanan}`, {
+          credentials: 'include'
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setInitialReview({
+            ulasan: data.ulasan || '',
+            rating: data.rating || 0
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch review data:', err);
+      }
+    }
+  };
+
+  if (user?.email) {
+    fetchReviewData();
+  }
+}, [idPesanan, mode, user]);
+
   if (loading) {
     return (
       <>
@@ -76,7 +103,7 @@ export default function ReviewPage() {
                 userEmail={user.email}
                 isUpdate={mode === 'edit'}
                 onSuccess={() => {
-                  router.push('/user/orders')
+                  router.push('/order')
                 }}
                 onCancel={() => router.back()}
               />
@@ -86,7 +113,7 @@ export default function ReviewPage() {
           <>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-medium">Riwayat Ulasan Anda</h2>
-              <Link href="/dashboard"> 
+              <Link href="/order"> 
                 <Button variant="outline" size="sm">
                   Lihat Pesanan Anda
                 </Button>
