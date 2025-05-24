@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -33,14 +33,6 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import {
     Select,
     SelectContent,
     SelectItem,
@@ -49,80 +41,41 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
 import {
-    Plus,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    Loader2,
+    Filter,
+    Copy,
     Edit,
     Trash2,
+    Plus,
     Search,
-    Filter,
-    Download,
-    Eye,
-    Copy,
-    Zap,
-    Sparkles,
     Shield,
+    Sparkles,
+    Eye,
+    Download,
+    Zap,
 } from "lucide-react";
-
-// Types
-interface Coupon {
-    id: string;
-    code: string;
-    name: string;
-    description: string;
-    discountType: "percentage" | "fixed";
-    discountValue: number;
-    maxUsage: number;
-    currentUsage: number;
-    minOrderAmount: number;
-    expiryDate: string;
-    isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-// Mock data - replace with actual API calls
-const mockCoupons: Coupon[] = [
-    {
-        id: "1",
-        code: "WELCOME2024",
-        name: "Welcome Discount",
-        description: "Diskon selamat datang untuk pengguna baru",
-        discountType: "percentage",
-        discountValue: 20,
-        maxUsage: 100,
-        currentUsage: 45,
-        minOrderAmount: 50000,
-        expiryDate: "2024-12-31",
-        isActive: true,
-        createdAt: "2024-01-15",
-        updatedAt: "2024-01-15",
-    },
-    {
-        id: "2",
-        code: "FLASH50",
-        name: "Flash Sale",
-        description: "Diskon kilat untuk pembelian hari ini",
-        discountType: "fixed",
-        discountValue: 50000,
-        maxUsage: 50,
-        currentUsage: 32,
-        minOrderAmount: 200000,
-        expiryDate: "2024-06-30",
-        isActive: true,
-        createdAt: "2024-01-10",
-        updatedAt: "2024-01-20",
-    },
-];
+import { useToast } from "@/hooks/use-toast";
+import { CouponAPI, type Coupon } from "@/lib/api/coupon-api";
 
 export default function AdminCouponsPage() {
-    const [coupons, setCoupons] = useState<Coupon[]>(mockCoupons);
+    const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState<string>("all");
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const { toast } = useToast();
 
     // Form state
     const [formData, setFormData] = useState({
@@ -135,6 +88,29 @@ export default function AdminCouponsPage() {
         expiryDate: "",
         isActive: true,
     });
+
+    // Load coupons from API on component mount
+    useEffect(() => {
+        loadCoupons();
+    }, []);
+
+    // Load coupons from backend
+    const loadCoupons = async () => {
+        try {
+            setIsInitialLoading(true);
+            const fetchedCoupons = await CouponAPI.getAllCoupons();
+            setCoupons(fetchedCoupons);
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Gagal memuat data kupon",
+                variant: "destructive",
+            });
+            console.error("Error loading coupons:", error);
+        } finally {
+            setIsInitialLoading(false);
+        }
+    };
 
     // Generate random coupon code
     const generateCouponCode = () => {
@@ -178,23 +154,58 @@ export default function AdminCouponsPage() {
     const handleCreateCoupon = async () => {
         setIsLoading(true);
         try {
-            const newCoupon: Coupon = {
-                id: Date.now().toString(),
-                code: generateCouponCode(),
-                ...formData,
-                currentUsage: 0,
-                createdAt: new Date().toISOString().split("T")[0],
-                updatedAt: new Date().toISOString().split("T")[0],
+            // Validasi input yang diperlukan backend
+            if (!formData.discountValue || formData.discountValue <= 0) {
+                toast({
+                    title: "Error",
+                    description: "Nilai diskon harus lebih besar dari 0",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            if (!formData.maxUsage || formData.maxUsage <= 0) {
+                toast({
+                    title: "Error",
+                    description: "Maksimal penggunaan harus lebih besar dari 0",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            const newCouponData = {
+                code: generateCouponCode(), // Generate kode kupon
+                discountValue: formData.discountValue, // akan di-map ke 'potongan'
+                maxUsage: formData.maxUsage, // akan di-map ke 'batasPemakaian'
+                // Field lain tidak dikirim ke backend karena tidak diperlukan
+                name: formData.name || `Kupon ${formData.discountValue}%`,
+                description:
+                    formData.description ||
+                    `Kupon diskon ${formData.discountValue}%`,
+                discountType: formData.discountType,
+                minOrderAmount: formData.minOrderAmount,
+                expiryDate: formData.expiryDate,
+                isActive: formData.isActive,
             };
 
+            const newCoupon = await CouponAPI.createCoupon(newCouponData);
             setCoupons([...coupons, newCoupon]);
             setIsCreateDialogOpen(false);
             resetForm();
-            toast.success("Kupon berhasil dibuat!", {
-                description: `Kode kupon: ${newCoupon.code}`,
+            toast({
+                title: "Sukses",
+                description: `Kupon berhasil dibuat! Kode kupon: ${newCoupon.code}`,
             });
         } catch (error) {
-            toast.error("Gagal membuat kupon");
+            console.error("Create coupon error:", error);
+            toast({
+                title: "Error",
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal membuat kupon",
+                variant: "destructive",
+            });
         } finally {
             setIsLoading(false);
         }
@@ -206,36 +217,86 @@ export default function AdminCouponsPage() {
 
         setIsLoading(true);
         try {
+            // Validasi input yang diperlukan backend
+            if (!formData.discountValue || formData.discountValue <= 0) {
+                toast({
+                    title: "Error",
+                    description: "Nilai diskon harus lebih besar dari 0",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            if (!formData.maxUsage || formData.maxUsage <= 0) {
+                toast({
+                    title: "Error",
+                    description: "Maksimal penggunaan harus lebih besar dari 0",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            const updateData = {
+                discountValue: formData.discountValue, // akan di-map ke 'potongan'
+                maxUsage: formData.maxUsage, // akan di-map ke 'batasPemakaian'
+                // Field lain tidak dikirim ke backend
+                name: formData.name,
+                description: formData.description,
+                discountType: formData.discountType,
+                minOrderAmount: formData.minOrderAmount,
+                expiryDate: formData.expiryDate,
+                isActive: formData.isActive,
+            };
+
+            const updatedCoupon = await CouponAPI.updateCoupon(
+                selectedCoupon.code,
+                updateData
+            );
+
             const updatedCoupons = coupons.map((coupon) =>
-                coupon.id === selectedCoupon.id
-                    ? {
-                          ...coupon,
-                          ...formData,
-                          updatedAt: new Date().toISOString().split("T")[0],
-                      }
-                    : coupon
+                coupon.id === selectedCoupon.id ? updatedCoupon : coupon
             );
 
             setCoupons(updatedCoupons);
             setIsEditDialogOpen(false);
             setSelectedCoupon(null);
             resetForm();
-            toast.success("Kupon berhasil diperbarui!");
+            toast({
+                title: "Sukses",
+                description: "Kupon berhasil diperbarui!",
+            });
         } catch (error) {
-            toast.error("Gagal memperbarui kupon");
+            console.error("Update coupon error:", error);
+            toast({
+                title: "Error",
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal memperbarui kupon",
+                variant: "destructive",
+            });
         } finally {
             setIsLoading(false);
         }
     };
 
     // Handle delete coupon
-    const handleDeleteCoupon = async (couponId: string) => {
+    const handleDeleteCoupon = async (couponCode: string) => {
         setIsLoading(true);
         try {
-            setCoupons(coupons.filter((coupon) => coupon.id !== couponId));
-            toast.success("Kupon berhasil dihapus!");
+            await CouponAPI.deleteCoupon(couponCode);
+            setCoupons(coupons.filter((coupon) => coupon.code !== couponCode));
+            toast({
+                title: "Sukses",
+                description: "Kupon berhasil dihapus!",
+            });
         } catch (error) {
-            toast.error("Gagal menghapus kupon");
+            toast({
+                title: "Error",
+                description: "Gagal menghapus kupon",
+                variant: "destructive",
+            });
+            console.error("Error deleting coupon:", error);
         } finally {
             setIsLoading(false);
         }
@@ -260,7 +321,10 @@ export default function AdminCouponsPage() {
     // Copy coupon code
     const copyCouponCode = (code: string) => {
         navigator.clipboard.writeText(code);
-        toast.success("Kode kupon disalin!");
+        toast({
+            title: "Sukses",
+            description: "Kode kupon disalin!",
+        });
     };
 
     // Get status badge
@@ -304,6 +368,20 @@ export default function AdminCouponsPage() {
             </Badge>
         );
     };
+
+    // Show loading spinner during initial load
+    if (isInitialLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+                <div className="flex items-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+                    <span className="text-xl text-white">
+                        Memuat data kupon...
+                    </span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
@@ -511,16 +589,23 @@ export default function AdminCouponsPage() {
                                 <Button
                                     variant="outline"
                                     onClick={() => setIsCreateDialogOpen(false)}
-                                    className="border-slate-600 text-slate-900 hover:text-white hover:bg-slate-700"
+                                    className="border-slate-600 text-slate-200 hover:text-white hover:bg-slate-700"
                                 >
                                     Batal
                                 </Button>
                                 <Button
                                     onClick={handleCreateCoupon}
                                     disabled={isLoading}
-                                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-900 hover:to-blue-500"
+                                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                                 >
-                                    {isLoading ? "Membuat..." : "Buat Kupon"}
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Membuat...
+                                        </>
+                                    ) : (
+                                        "Buat Kupon"
+                                    )}
                                 </Button>
                             </DialogFooter>
                         </DialogContent>
@@ -648,10 +733,11 @@ export default function AdminCouponsPage() {
                             </Select>
                             <Button
                                 variant="outline"
-                                className="border-slate-600"
+                                className="border-slate-600 hover:border-slate-500"
+                                onClick={loadCoupons}
                             >
                                 <Download className="h-4 w-4 mr-2" />
-                                Export
+                                Refresh
                             </Button>
                         </div>
                     </CardContent>
@@ -664,7 +750,7 @@ export default function AdminCouponsPage() {
                             Daftar Kupon
                         </CardTitle>
                         <CardDescription className="text-slate-400">
-                            Kelola semua kupon diskon Anda
+                            Kelola semua kupon diskon Anda di sini
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -699,156 +785,186 @@ export default function AdminCouponsPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredCoupons.map((coupon) => (
-                                        <TableRow
-                                            key={coupon.id}
-                                            className="border-slate-700"
-                                        >
-                                            <TableCell className="font-mono">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-purple-400">
-                                                        {coupon.code}
-                                                    </span>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            copyCouponCode(
-                                                                coupon.code
-                                                            )
-                                                        }
-                                                        className="h-6 w-6 p-0"
-                                                    >
-                                                        <Copy className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div>
-                                                    <p className="font-medium text-white">
-                                                        {coupon.name}
-                                                    </p>
-                                                    <p className="text-sm text-slate-400">
-                                                        {coupon.description}
-                                                    </p>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-green-400">
-                                                    {coupon.discountType ===
-                                                    "percentage"
-                                                        ? `${coupon.discountValue}%`
-                                                        : `Rp ${coupon.discountValue.toLocaleString()}`}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-white">
-                                                            {
-                                                                coupon.currentUsage
-                                                            }
-                                                        </span>
-                                                        <span className="text-slate-400">
-                                                            /
-                                                        </span>
-                                                        <span className="text-slate-400">
-                                                            {coupon.maxUsage}
-                                                        </span>
-                                                    </div>
-                                                    <div className="w-full bg-slate-700 rounded-full h-2">
-                                                        <div
-                                                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full"
-                                                            style={{
-                                                                width: `${
-                                                                    (coupon.currentUsage /
-                                                                        coupon.maxUsage) *
-                                                                    100
-                                                                }%`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-slate-300">
-                                                Rp{" "}
-                                                {coupon.minOrderAmount.toLocaleString()}
-                                            </TableCell>
-                                            <TableCell className="text-slate-300">
-                                                {new Date(
-                                                    coupon.expiryDate
-                                                ).toLocaleDateString("id-ID")}
-                                            </TableCell>
-                                            <TableCell>
-                                                {getStatusBadge(coupon)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            openEditDialog(
-                                                                coupon
-                                                            )
-                                                        }
-                                                        className="h-8 w-8 p-0 text-blue-400 hover:text-blue-300"
-                                                    >
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger
-                                                            asChild
-                                                        >
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-8 w-8 p-0 text-red-400 hover:text-red-300"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent className="bg-slate-900 border-slate-700">
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle className="text-white">
-                                                                    Hapus Kupon
-                                                                </AlertDialogTitle>
-                                                                <AlertDialogDescription className="text-slate-400">
-                                                                    Apakah Anda
-                                                                    yakin ingin
-                                                                    menghapus
-                                                                    kupon "
-                                                                    {
-                                                                        coupon.name
-                                                                    }
-                                                                    "? Tindakan
-                                                                    ini tidak
-                                                                    dapat
-                                                                    dibatalkan.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel className="border-slate-600">
-                                                                    Batal
-                                                                </AlertDialogCancel>
-                                                                <AlertDialogAction
-                                                                    onClick={() =>
-                                                                        handleDeleteCoupon(
-                                                                            coupon.id
-                                                                        )
-                                                                    }
-                                                                    className="bg-red-600 hover:bg-red-700"
-                                                                >
-                                                                    Hapus
-                                                                </AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </div>
+                                    {filteredCoupons.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={8}
+                                                className="text-center py-10 text-slate-400"
+                                            >
+                                                {searchTerm ||
+                                                filterStatus !== "all"
+                                                    ? "Tidak ada kupon yang sesuai dengan kriteria pencarian"
+                                                    : "Belum ada kupon tersedia"}
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    ) : (
+                                        filteredCoupons.map((coupon) => (
+                                            <TableRow
+                                                key={coupon.id}
+                                                className="border-slate-700"
+                                            >
+                                                <TableCell className="font-mono">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-purple-400">
+                                                            {coupon.code}
+                                                        </span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                copyCouponCode(
+                                                                    coupon.code
+                                                                )
+                                                            }
+                                                            className="h-6 w-6 p-0"
+                                                        >
+                                                            <Copy className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div>
+                                                        <p className="font-medium text-white">
+                                                            {coupon.name}
+                                                        </p>
+                                                        <p className="text-sm text-slate-400">
+                                                            {coupon.description}
+                                                        </p>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-green-400">
+                                                        {coupon.discountType ===
+                                                        "percentage"
+                                                            ? `${coupon.discountValue}%`
+                                                            : `Rp ${coupon.discountValue.toLocaleString()}`}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-white">
+                                                                {
+                                                                    coupon.currentUsage
+                                                                }
+                                                            </span>
+                                                            <span className="text-slate-400">
+                                                                /
+                                                            </span>
+                                                            <span className="text-slate-400">
+                                                                {
+                                                                    coupon.maxUsage
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                        <div className="w-full bg-slate-700 rounded-full h-2">
+                                                            <div
+                                                                className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full"
+                                                                style={{
+                                                                    width: `${
+                                                                        (coupon.currentUsage /
+                                                                            coupon.maxUsage) *
+                                                                        100
+                                                                    }%`,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-slate-300">
+                                                    Rp{" "}
+                                                    {coupon.minOrderAmount.toLocaleString()}
+                                                </TableCell>
+                                                <TableCell className="text-slate-300">
+                                                    {new Date(
+                                                        coupon.expiryDate
+                                                    ).toLocaleDateString(
+                                                        "id-ID"
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {getStatusBadge(coupon)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                openEditDialog(
+                                                                    coupon
+                                                                )
+                                                            }
+                                                            className="h-8 w-8 p-0 text-blue-400 hover:text-blue-300"
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger
+                                                                asChild
+                                                            >
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0 text-red-400 hover:text-red-300"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent className="bg-slate-900 border-slate-700">
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle className="text-white">
+                                                                        Hapus
+                                                                        Kupon
+                                                                    </AlertDialogTitle>
+                                                                    <AlertDialogDescription className="text-slate-400">
+                                                                        Apakah
+                                                                        Anda
+                                                                        yakin
+                                                                        ingin
+                                                                        menghapus
+                                                                        kupon "
+                                                                        {
+                                                                            coupon.name
+                                                                        }
+                                                                        "?
+                                                                        Tindakan
+                                                                        ini
+                                                                        tidak
+                                                                        dapat
+                                                                        dibatalkan.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel className="border-slate-600">
+                                                                        Batal
+                                                                    </AlertDialogCancel>
+                                                                    <AlertDialogAction
+                                                                        onClick={() =>
+                                                                            handleDeleteCoupon(
+                                                                                coupon.code
+                                                                            )
+                                                                        }
+                                                                        className="bg-red-600 hover:bg-red-700"
+                                                                    >
+                                                                        {isLoading ? (
+                                                                            <>
+                                                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                                                Menghapus...
+                                                                            </>
+                                                                        ) : (
+                                                                            "Hapus"
+                                                                        )}
+                                                                    </AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
                                 </TableBody>
                             </Table>
                         </div>
@@ -1041,7 +1157,6 @@ export default function AdminCouponsPage() {
                         </div>
 
                         <DialogFooter>
-                            {" "}
                             <Button
                                 variant="outline"
                                 onClick={() => setIsEditDialogOpen(false)}
@@ -1054,9 +1169,14 @@ export default function AdminCouponsPage() {
                                 disabled={isLoading}
                                 className="bg-gradient-to-r from-blue-600 to-purple-600"
                             >
-                                {isLoading
-                                    ? "Menyimpan..."
-                                    : "Simpan Perubahan"}
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Menyimpan...
+                                    </>
+                                ) : (
+                                    "Simpan Perubahan"
+                                )}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
