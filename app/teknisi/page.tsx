@@ -27,46 +27,41 @@ export default function TeknisiPage() {
 
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [laporan, setLaporan] = useState("");
-  const [rating, setRating] = useState<number>(0);
-
   const [estimasiHarga, setEstimasiHarga] = useState("");
   const [estimasiWaktu, setEstimasiWaktu] = useState("");
 
   const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
 
-  const fetchOrders = async () => {
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    if (!user?.email) return;
-    try {
-      const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      console.log("Fetched orders:", data);
-      console.log("Email being sent:", JSON.parse(localStorage.getItem("user") || "null").email);
-      setOrders(Array.isArray(data) ? data : []);
-      
-      // Calculate stats
-      if (Array.isArray(data)) {
-        setTotalOrder(data.length);
-        const selesaiOrders = data.filter(
-          (order) => order.statusPesanan.toLowerCase() === "Pesanan Selesai"
-        );
-        setSelesaiCount(selesaiOrders.length);
-        const penghasilan = selesaiOrders.reduce(
-          (total, order) => total + (order.estimasiHarga || 0),
-          0
-        );
-        setTotalPenghasilan(penghasilan);
-      }
-    } catch (err) {
-      console.error("Failed to fetch orders", err);
-    }
-  };
-
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const fetchOrders = async () => {
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  if (!user?.email) return;
+
+  try {
+    const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${user.token}`
+      }
+    });
+    const data = await res.json();
+    setOrders(Array.isArray(data) ? data : []);
+
+    if (Array.isArray(data)) {
+      setTotalOrder(data.length);
+      const selesai = data.filter((d: Order) => d.statusPesanan.toLowerCase() === "selesai");
+      setSelesaiCount(selesai.length);
+      const penghasilan = selesai.reduce((acc, cur) => acc + (cur.estimasiHarga || 0), 0);
+      setTotalPenghasilan(penghasilan);
+    }
+  } catch (err) {
+    console.error("Gagal fetch pesanan:", err);
+  }
+};
 
   const handleOpenAmbilModal = (id: number) => {
     setSelectedOrderId(id);
@@ -75,41 +70,38 @@ export default function TeknisiPage() {
     setEstimasiWaktu("");
   };
 
-  const handleConfirmAmbilPesanan = () => {
-    if (selectedOrderId === null) return;
-    if (!estimasiHarga || !estimasiWaktu) {
-      alert("Mohon isi estimasi harga dan estimasi waktu.");
+  const handleConfirmAmbilPesanan = async () => {
+    if (!estimasiHarga || !estimasiWaktu || selectedOrderId === null) {
+      alert("Isi estimasi harga dan waktu.");
       return;
     }
 
     const harga = parseInt(estimasiHarga);
+    try {
+      await fetch(`/api/pesanan/ambil-pesanan/${selectedOrderId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estimasiHarga: harga, estimasiWaktu }),
+      });
 
-    fetch(`/api/pesanan/ambil-pesanan/${selectedOrderId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        estimasiHarga: harga,
-        estimasiWaktu,
-      }),
-    })
-      .then(() => {
-        alert("Pesanan berhasil diambil dengan estimasi.");
-        setOrders((prev) =>
-          prev.map((order) =>
-            order.id === selectedOrderId
-              ? {
-                  ...order,
-                  statusPesanan: "DIKERJAKAN",
-                  estimasiHarga: harga,
-                  estimasiWaktu,
-                }
-              : order
-          )
-        );
-        setShowAmbilModal(false);
-        setSelectedOrderId(null);
-      })
-      .catch((err) => console.error(err));
+      alert("Pesanan berhasil diambil.");
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === selectedOrderId
+            ? {
+                ...order,
+                statusPesanan: "DIKERJAKAN",
+                estimasiHarga: harga,
+                estimasiWaktu,
+              }
+            : order
+        )
+      );
+      setShowAmbilModal(false);
+      setSelectedOrderId(null);
+    } catch (err) {
+      console.error("Gagal ambil pesanan:", err);
+    }
   };
 
   const handleSelesaikanPesanan = (id: number) => {
@@ -117,27 +109,42 @@ export default function TeknisiPage() {
     setShowSelesaikanModal(true);
   };
 
-  const handleSubmitLaporan = async () => {
-    if (selectedOrderId === null) return;
-    try {
-      await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ laporan, emailTeknisi: JSON.parse(localStorage.getItem("user") || "null").email }),
-      });
+const handleSubmitLaporan = async () => {
+  if (!laporan || selectedOrderId === null) return;
 
-      alert("Pesanan diselesaikan dan laporan berhasil dikirim.");
-      console.log("Laporan berhasil dikirim:", { laporan });
-      console.log(JSON.parse(localStorage.getItem("user") || "null").role);
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  if (!user || !user.token) {
+    alert("Token tidak ditemukan. Silakan login ulang.");
+    return;
+  }
 
-      setLaporan("");
-      setRating(0);
-      setShowSelesaikanModal(false);
-      setSelectedOrderId(null);
-    } catch (err) {
-      console.error("Gagal mengirim laporan:", err);
+  try {
+    const response = await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${user.token}`, // ← Tambahkan ini
+      },
+      body: JSON.stringify({ laporan, emailTeknisi: user.email }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("HTTP Error:", response.status, errorData);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
+
+    alert("Laporan berhasil dikirim.");
+    setShowSelesaikanModal(false);
+    setSelectedOrderId(null);
+    setLaporan("");
+  } catch (err) {
+    console.error("Gagal kirim laporan:", err);
+    alert("Gagal kirim laporan. Coba login ulang atau hubungi admin.");
+  }
+};
+
+
 
   const handleOpenDetailModal = (id: number) => {
     setSelectedOrderId(id);
