@@ -42,10 +42,10 @@ export default function TeknisiPage() {
 
   try {
     const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
-      credentials: "include",
+      credentials: "include", // This ensures cookies are sent with the request
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${user.token}`
+        "Content-Type": "application/json"
+        // No Authorization header needed with session-based auth
       }
     });
     const data = await res.json();
@@ -113,17 +113,17 @@ const handleSubmitLaporan = async () => {
   if (!laporan || selectedOrderId === null) return;
 
   const user = JSON.parse(localStorage.getItem("user") || "null");
-  if (!user || !user.token) {
-    alert("Token tidak ditemukan. Silakan login ulang.");
+  if (!user?.email) {
+    alert("Informasi user tidak ditemukan. Silakan login ulang.");
     return;
   }
 
   try {
     const response = await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
       method: "POST",
+      credentials: "include", // This ensures cookies are sent with the request
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${user.token}`, // ← Tambahkan ini
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({ laporan, emailTeknisi: user.email }),
     });
