@@ -11,7 +11,7 @@ interface Order {
   kondisiBarang: string;
   statusPesanan: string;
   date: string;
-  estimasiHarga?: number;
+  harga?: number;
   estimasiWaktu?: string;
 }
 
@@ -37,31 +37,63 @@ export default function TeknisiPage() {
   }, []);
 
   const fetchOrders = async () => {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-  if (!user?.email) return;
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (!user?.email) return;
 
+<<<<<<< Updated upstream
   try {
     const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${user.token}`
-      }
-    });
-    const data = await res.json();
-    setOrders(Array.isArray(data) ? data : []);
+=======
+    try {
+      const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${user.token}`
+        }
+      });
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
 
-    if (Array.isArray(data)) {
-      setTotalOrder(data.length);
-      const selesai = data.filter((d: Order) => d.statusPesanan.toLowerCase() === "selesai");
-      setSelesaiCount(selesai.length);
-      const penghasilan = selesai.reduce((acc, cur) => acc + (cur.estimasiHarga || 0), 0);
-      setTotalPenghasilan(penghasilan);
+      if (Array.isArray(data)) {
+        setTotalOrder(data.length);
+        
+        // Debug what statuses are actually coming back
+        console.log("Status values in orders:", data.map(d => d.statusPesanan));
+        
+        // Make the filter case-insensitive and check for variations
+        const selesai = data.filter((d: Order) => {
+          const status = d.statusPesanan?.toLowerCase();
+          return status === "pesanan selesai" || status === "selesai";
+        });
+        
+        console.log("Completed orders:", selesai);
+        setSelesaiCount(selesai.length);
+        
+        // Check the prices before calculating
+        console.log("Prices of completed orders:", selesai.map(order => order.estimasiHarga));
+        
+        // Calculate total income from completed orders only
+        const penghasilan = selesai.reduce((acc, cur) => {
+          const harga = typeof cur.harga === 'string' 
+            ? parseInt(cur.harga) 
+            : (cur.harga || 0);
+          return acc + harga;
+        }, 0);
+
+        
+        console.log("Calculated total income:", penghasilan);
+        setTotalPenghasilan(penghasilan);
+>>>>>>> Stashed changes
+      }
+    } catch (err) {
+      console.error("Gagal fetch pesanan:", err);
     }
-  } catch (err) {
-    console.error("Gagal fetch pesanan:", err);
-  }
-};
+  };
 
   const handleOpenAmbilModal = (id: number) => {
     setSelectedOrderId(id);
@@ -321,8 +353,8 @@ const handleSubmitLaporan = async () => {
             <p><strong>Nama Barang:</strong> {selectedOrder.namaBarang}</p>
             <p><strong>Deskripsi:</strong> {selectedOrder.kondisiBarang}</p>
             <p><strong>Status:</strong> {selectedOrder.statusPesanan}</p>
-            {selectedOrder.estimasiHarga !== undefined && (
-              <p><strong>Estimasi Harga:</strong> Rp {selectedOrder.estimasiHarga.toLocaleString()}</p>
+            {selectedOrder.harga !== undefined && (
+              <p><strong>Estimasi Harga:</strong> Rp {selectedOrder.harga.toLocaleString()}</p>
             )}
             {selectedOrder.estimasiWaktu && (
               <p><strong>Estimasi Waktu:</strong> {selectedOrder.estimasiWaktu}</p>
