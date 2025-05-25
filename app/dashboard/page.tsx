@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import { Wrench, ChevronLeft, ChevronRight } from "lucide-react";
+import { Wrench, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-
 
 const services = [
   { name: "Handphone", image: "https://cdn.rri.co.id/berita/Palangkaraya/o/1733357402136-hand-holding-shattered-smart-phone-communication-lost-generated-by-ai/g2r4uve7vefbipk.jpeg" },
@@ -30,6 +29,8 @@ export default function Home() {
     const [loading, setLoading] = useState(true);
     const [jumlahPesanan, setJumlahPesanan] = useState(0);
     const [username, setUsername] = useState("User");
+    const [userEmail, setUserEmail] = useState("");
+    const [recentReviews, setRecentReviews] = useState<any[]>([]);
     const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     containScroll: 'trimSnaps',
@@ -56,6 +57,30 @@ export default function Home() {
             setJumlahPesanan(0);
         }
     };
+    
+    const fetchReviews = async (email: string) => {
+        try {            
+            // Fetch
+            const response = await fetch(`/api/report/pengguna/${encodeURIComponent(email)}`, {
+                credentials: 'include',
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Sort
+                const sortedReviews = Array.isArray(data) ? 
+                    [...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 2) : 
+                    [];
+
+                setRecentReviews(sortedReviews);
+            } else {
+                setRecentReviews([]);
+            }
+        } catch (error) {
+            setRecentReviews([]);
+        }
+    };
   
     useEffect(() => {
     const checkAuth = async () => {
@@ -74,9 +99,14 @@ export default function Home() {
         // Session valid, ambil data user
         const userData = await response.json();
         setUsername(userData.namaLengkap);
+        setUserEmail(userData.email);
         
         // Fetch jumlah pesanan
         fetchJumlahPesanan();
+        
+        // Fetch reviews 
+        fetchReviews(userData.email);
+        
         setLoading(false);
         } catch (error) {
         console.error("Auth check failed:", error);
@@ -221,13 +251,44 @@ export default function Home() {
             Rating dan Ulasan By User
           </h3>
           <div className="space-y-4">
-            <div className="h-16 bg-gray-100 rounded-lg"></div>
-            <div className="h-16 bg-gray-100 rounded-lg"></div>
+            {recentReviews.length > 0 ? (
+              recentReviews.map((review) => (
+                <div 
+                  key={review.id} 
+                  className="p-3 bg-gray-50 border border-gray-100 rounded-lg"
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="font-medium">Pesanan #{review.pesanan.id}</div>
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <Star 
+                          key={i} 
+                          size={14}
+                          className={`${i < review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 line-clamp-2">{review.ulasan}</p>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="h-16 bg-gray-50 rounded-lg flex items-center justify-center">
+                  <p className="text-gray-500 text-sm">Belum ada ulasan</p>
+                </div>
+                <div className="h-16 bg-gray-50 rounded-lg flex items-center justify-center">
+                  <p className="text-gray-500 text-sm">Belum ada ulasan</p>
+                </div>
+              </>
+            )}
           </div>
           <div className="text-right mt-4">
-            <Button variant="link" className="text-[#10316B]">
-              See More
-            </Button>
+            <Link href="/review">
+              <Button variant="link" className="text-[#10316B]">
+                See More
+              </Button>
+            </Link>
           </div>
         </Card>
       </section>
