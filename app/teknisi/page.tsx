@@ -34,14 +34,23 @@ export default function TeknisiPage() {
 
   const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
 
-  useEffect(() => {
-    fetch(`/api/pesanan/teknisi/ani@mail.com`)
-      .then((res) => res.json())
-      .then((data: Order[]) => {
-        setOrders(data);
+  const fetchOrders = async () => {
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (!user?.email) return;
+    try {
+      const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      console.log("Fetched orders:", data);
+      console.log("Email being sent:", JSON.parse(localStorage.getItem("user") || "null").email);
+      setOrders(Array.isArray(data) ? data : []);
+      
+      // Calculate stats
+      if (Array.isArray(data)) {
         setTotalOrder(data.length);
         const selesaiOrders = data.filter(
-          (order) => order.statusPesanan.toLowerCase() === "selesai"
+          (order) => order.statusPesanan.toLowerCase() === "Pesanan Selesai"
         );
         setSelesaiCount(selesaiOrders.length);
         const penghasilan = selesaiOrders.reduce(
@@ -49,8 +58,14 @@ export default function TeknisiPage() {
           0
         );
         setTotalPenghasilan(penghasilan);
-      })
-      .catch((err) => console.error("Error fetching orders:", err));
+      }
+    } catch (err) {
+      console.error("Failed to fetch orders", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
   }, []);
 
   const handleOpenAmbilModal = (id: number) => {
@@ -84,7 +99,7 @@ export default function TeknisiPage() {
             order.id === selectedOrderId
               ? {
                   ...order,
-                  statusPesanan: "diproses",
+                  statusPesanan: "DIKERJAKAN",
                   estimasiHarga: harga,
                   estimasiWaktu,
                 }
@@ -108,22 +123,12 @@ export default function TeknisiPage() {
       await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ laporan }),
-      });
-
-      await fetch(`/api/pesanan/update-status/${selectedOrderId}`, {
-        method: "PUT",
+        body: JSON.stringify({ laporan, emailTeknisi: JSON.parse(localStorage.getItem("user") || "null").email }),
       });
 
       alert("Pesanan diselesaikan dan laporan berhasil dikirim.");
-
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === selectedOrderId
-            ? { ...order, statusPesanan: "Selesai" }
-            : order
-        )
-      );
+      console.log("Laporan berhasil dikirim:", { laporan });
+      console.log(JSON.parse(localStorage.getItem("user") || "null").role);
 
       setLaporan("");
       setRating(0);
