@@ -11,7 +11,7 @@ interface Order {
   kondisiBarang: string;
   statusPesanan: string;
   date: string;
-  estimasiHarga?: number;
+  harga?: number;
   estimasiWaktu?: string;
 }
 
@@ -27,31 +27,64 @@ export default function TeknisiPage() {
 
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [laporan, setLaporan] = useState("");
-  const [rating, setRating] = useState<number>(0);
-
   const [estimasiHarga, setEstimasiHarga] = useState("");
   const [estimasiWaktu, setEstimasiWaktu] = useState("");
 
   const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
 
   useEffect(() => {
-    fetch(`/api/pesanan/teknisi/ani@mail.com`)
-      .then((res) => res.json())
-      .then((data: Order[]) => {
-        setOrders(data);
-        setTotalOrder(data.length);
-        const selesaiOrders = data.filter(
-          (order) => order.statusPesanan.toLowerCase() === "selesai"
-        );
-        setSelesaiCount(selesaiOrders.length);
-        const penghasilan = selesaiOrders.reduce(
-          (total, order) => total + (order.estimasiHarga || 0),
-          0
-        );
-        setTotalPenghasilan(penghasilan);
-      })
-      .catch((err) => console.error("Error fetching orders:", err));
+    fetchOrders();
   }, []);
+
+  const fetchOrders = async () => {
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (!user?.email) return;
+
+    try {
+      const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${user.token}`
+        }
+      });
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+
+      if (Array.isArray(data)) {
+        setTotalOrder(data.length);
+        
+        // Debug what statuses are actually coming back
+        console.log("Status values in orders:", data.map(d => d.statusPesanan));
+        
+        // Make the filter case-insensitive and check for variations
+        const selesai = data.filter((d: Order) => {
+          const status = d.statusPesanan?.toLowerCase();
+          return status === "pesanan selesai" || status === "selesai";
+        });
+        
+        console.log("Completed orders:", selesai);
+        setSelesaiCount(selesai.length);
+        
+        // Check the prices before calculating
+        console.log("Prices of completed orders:", selesai.map(order => order.estimasiHarga));
+        
+        // Calculate total income from completed orders only
+        const penghasilan = selesai.reduce((acc, cur) => {
+          const harga = typeof cur.harga === 'string' 
+            ? parseInt(cur.harga) 
+            : (cur.harga || 0);
+          return acc + harga;
+        }, 0);
+
+        
+        console.log("Calculated total income:", penghasilan);
+        setTotalPenghasilan(penghasilan);
+      }
+    } catch (err) {
+      console.error("Gagal fetch pesanan:", err);
+    }
+  };
 
   const handleOpenAmbilModal = (id: number) => {
     setSelectedOrderId(id);
@@ -60,41 +93,38 @@ export default function TeknisiPage() {
     setEstimasiWaktu("");
   };
 
-  const handleConfirmAmbilPesanan = () => {
-    if (selectedOrderId === null) return;
-    if (!estimasiHarga || !estimasiWaktu) {
-      alert("Mohon isi estimasi harga dan estimasi waktu.");
+  const handleConfirmAmbilPesanan = async () => {
+    if (!estimasiHarga || !estimasiWaktu || selectedOrderId === null) {
+      alert("Isi estimasi harga dan waktu.");
       return;
     }
 
     const harga = parseInt(estimasiHarga);
+    try {
+      await fetch(`/api/pesanan/ambil-pesanan/${selectedOrderId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estimasiHarga: harga, estimasiWaktu }),
+      });
 
-    fetch(`/api/pesanan/ambil-pesanan/${selectedOrderId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        estimasiHarga: harga,
-        estimasiWaktu,
-      }),
-    })
-      .then(() => {
-        alert("Pesanan berhasil diambil dengan estimasi.");
-        setOrders((prev) =>
-          prev.map((order) =>
-            order.id === selectedOrderId
-              ? {
-                  ...order,
-                  statusPesanan: "diproses",
-                  estimasiHarga: harga,
-                  estimasiWaktu,
-                }
-              : order
-          )
-        );
-        setShowAmbilModal(false);
-        setSelectedOrderId(null);
-      })
-      .catch((err) => console.error(err));
+      alert("Pesanan berhasil diambil.");
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === selectedOrderId
+            ? {
+                ...order,
+                statusPesanan: "DIKERJAKAN",
+                estimasiHarga: harga,
+                estimasiWaktu,
+              }
+            : order
+        )
+      );
+      setShowAmbilModal(false);
+      setSelectedOrderId(null);
+    } catch (err) {
+      console.error("Gagal ambil pesanan:", err);
+    }
   };
 
   const handleSelesaikanPesanan = (id: number) => {
@@ -102,37 +132,42 @@ export default function TeknisiPage() {
     setShowSelesaikanModal(true);
   };
 
-  const handleSubmitLaporan = async () => {
-    if (selectedOrderId === null) return;
-    try {
-      await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ laporan }),
-      });
+const handleSubmitLaporan = async () => {
+  if (!laporan || selectedOrderId === null) return;
 
-      await fetch(`/api/pesanan/update-status/${selectedOrderId}`, {
-        method: "PUT",
-      });
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  if (!user?.email) {
+    alert("Informasi user tidak ditemukan. Silakan login ulang.");
+    return;
+  }
 
-      alert("Pesanan diselesaikan dan laporan berhasil dikirim.");
+  try {
+    const response = await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
+      method: "POST",
+      credentials: "include", // This ensures cookies are sent with the request
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ laporan, emailTeknisi: user.email }),
+    });
 
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === selectedOrderId
-            ? { ...order, statusPesanan: "Selesai" }
-            : order
-        )
-      );
-
-      setLaporan("");
-      setRating(0);
-      setShowSelesaikanModal(false);
-      setSelectedOrderId(null);
-    } catch (err) {
-      console.error("Gagal mengirim laporan:", err);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("HTTP Error:", response.status, errorData);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
+
+    alert("Laporan berhasil dikirim.");
+    setShowSelesaikanModal(false);
+    setSelectedOrderId(null);
+    setLaporan("");
+  } catch (err) {
+    console.error("Gagal kirim laporan:", err);
+    alert("Gagal kirim laporan. Coba login ulang atau hubungi admin.");
+  }
+};
+
+
 
   const handleOpenDetailModal = (id: number) => {
     setSelectedOrderId(id);
@@ -309,8 +344,8 @@ export default function TeknisiPage() {
             <p><strong>Nama Barang:</strong> {selectedOrder.namaBarang}</p>
             <p><strong>Deskripsi:</strong> {selectedOrder.kondisiBarang}</p>
             <p><strong>Status:</strong> {selectedOrder.statusPesanan}</p>
-            {selectedOrder.estimasiHarga !== undefined && (
-              <p><strong>Estimasi Harga:</strong> Rp {selectedOrder.estimasiHarga.toLocaleString()}</p>
+            {selectedOrder.harga !== undefined && (
+              <p><strong>Estimasi Harga:</strong> Rp {selectedOrder.harga.toLocaleString()}</p>
             )}
             {selectedOrder.estimasiWaktu && (
               <p><strong>Estimasi Waktu:</strong> {selectedOrder.estimasiWaktu}</p>

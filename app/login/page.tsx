@@ -1,131 +1,71 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import NavbarLogin from '@/components/ui/navbar/navbar-login'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    
-    try {
-      const response = await fetch('/api/user/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include'
-      })
-      
-      if (response.ok) {
-        const userData = await response.json()
-        
-        // Simpan beberapa info user untuk UI - ini optional
-        // Karena status autentikasi sebenarnya akan dicek via session
-        localStorage.setItem('user', JSON.stringify({
-          email: userData.email,
-          namaLengkap: userData.namaLengkap,
-          role: userData.role,
-        }))
-        
-        // Redirect berdasarkan role
-        if (userData.role?.toLowerCase() === 'teknisi') {
-          router.push('/teknisi')
-        } else if (userData.role?.toLowerCase() === 'pengguna') {
-          router.push('/dashboard')
-        } else {
-          router.push('/admin')
-        }
-      } else {
-        alert('Invalid credentials')
-      }
-    } catch (error) {
-      console.error('Login failed:', error)
-      alert('Login failed. Please try again.')
-    } finally {
-      setIsLoading(false)
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Dummy login logic
+    if (!email || !password) {
+      setError("Email and password are required");
+      return;
     }
-  }
+    // Example: set user in localStorage and redirect
+    localStorage.setItem(
+      "user",
+      JSON.stringify({
+        email,
+        role: email.includes("teknisi") ? "teknisi" : "user",
+      })
+    );
+    router.replace("/");
+  };
 
   return (
-    <main className="min-h-screen bg-white">
-      {/* Navbar */}
-      <NavbarLogin />
-
-      {/* Login Form */}
-      <div className="flex items-center justify-center min-h-[calc(100vh-80px)]">
-        <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-[#10316B]">Login to PerbaikiinAja</h1>
-            <p className="mt-2 text-gray-500">Enter your credentials to access your account</p>
-          </div>
-
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="password">Password</Label>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
-                <label
-                  htmlFor="remember"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Remember me
-                </label>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full bg-[#10316B] hover:bg-[#0B409C] text-white"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Logging in...' : 'Log in'}
-            </Button>
-
-            <div className="text-center text-sm">
-              Don't have an account?{' '}
-              <Link href="/register" className="text-[#0B409C] hover:underline font-medium">
-                Sign up
-              </Link>
-            </div>
-          </form>
+    <main className="min-h-screen flex items-center justify-center bg-white">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-[#f8fafc] p-8 rounded-lg shadow-md w-full max-w-md"
+      >
+        <h1 className="text-2xl font-bold mb-6 text-[#10316B]">Login</h1>
+        {error && <div className="mb-4 text-red-500">{error}</div>}
+        <div className="mb-4">
+          <label className="block mb-1 text-sm font-medium text-[#10316B]">
+            Email
+          </label>
+          <input
+            type="email"
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-[#10316B]"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
-      </div>
+        <div className="mb-6">
+          <label className="block mb-1 text-sm font-medium text-[#10316B]">
+            Password
+          </label>
+          <input
+            type="password"
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-[#10316B]"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          className="w-full bg-[#10316B] text-white py-2 rounded font-semibold hover:bg-[#0B409C] transition"
+        >
+          Login
+        </button>
+      </form>
     </main>
-  )
+  );
 }
