@@ -21,7 +21,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no \
               ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
             # Masuk ke direktori proyek
-            cd ~/PerbaikiinAja-fe-main
+            cd ~/PerbaikiinAja-fe
             
             # Update kode, install dependencies, dan restart
             git pull origin main
