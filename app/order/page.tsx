@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function OrderPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [namaBarang, setNamaBarang] = useState("");
@@ -221,6 +223,7 @@ export default function OrderPage() {
                   <th className="px-4 py-2">Status</th>
                   <th className="px-4 py-2">Tgl Servis</th>
                   <th className="px-4 py-2">Tgl Selesai</th>
+                  <th className="px-4 py-2">Review</th>
                 </tr>
               </thead>
               <tbody>
@@ -245,6 +248,16 @@ export default function OrderPage() {
                     </td>
                     <td className="px-4 py-2">{order.tanggalServis}</td>
                     <td className="px-4 py-2">{order.tanggalSelesai}</td>
+                    <td className="px-4 py-2">
+                      {order.statusPesanan === "Pesanan Selesai" && (
+                        <button
+                          className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                          onClick={() => router.push(`/createreview?id=${order.id}`)}
+                        >
+                          Add Review
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
