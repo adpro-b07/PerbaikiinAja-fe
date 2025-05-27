@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import NavbarTeknisi from "@/components/ui/navbar/navbar-teknisi";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 interface Order {
   id: number;
@@ -16,6 +17,8 @@ interface Order {
 }
 
 export default function TeknisiPage() {
+  const router = useRouter();
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [totalOrder, setTotalOrder] = useState(0);
   const [selesaiCount, setSelesaiCount] = useState(0);
@@ -33,8 +36,22 @@ export default function TeknisiPage() {
   const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
 
   useEffect(() => {
+    // Check if user is logged in and has teknisi role
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    
+    if (!user || !user.role) {
+      // No user, redirect to login
+      router.replace('/login');
+      return;
+    } else if (user.role.toLowerCase() !== 'teknisi') {
+      // User exists but wrong role, redirect to forbidden
+      router.replace('/forbidden');
+      return;
+    }
+    
+    setIsAuthChecking(false);
     fetchOrders();
-  }, []);
+  }, [router]);
 
   const fetchOrders = async () => {
     const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -173,6 +190,13 @@ const handleSubmitLaporan = async () => {
     setSelectedOrderId(id);
     setShowDetailModal(true);
   };
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#10316B]"></div>
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white">
