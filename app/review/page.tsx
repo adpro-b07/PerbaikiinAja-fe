@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ReviewForm from '@/components/ui/reviewform'
@@ -10,7 +10,21 @@ import { Star, ClipboardList, ThumbsUp } from 'lucide-react'
 import NavbarUSer from '@/components/ui/navbar/navbar-user'
 import { toast } from 'sonner'
 
-export default function ReviewPage() {
+// Loading 
+function LoadingView() {
+  return (
+    <>
+      <NavbarUSer />
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <p className="mt-4 text-gray-500">Memuat...</p>
+      </div>
+    </>
+  );
+}
+
+// Main 
+function ReviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
@@ -47,26 +61,50 @@ export default function ReviewPage() {
   const fetchAllUserReviews = async (email: string) => {
     setReviewLoading(true)
     try {
-      const res = await fetch(`/api/report/pengguna/${encodeURIComponent(email)}`, {
+      console.log('Fetching reviews for:', email);
+      
+      // Get all reports (ytta)
+      const res = await fetch(`/api/report`, {
         credentials: 'include'
       });
       
       if (res.ok) {
         const data = await res.json();
-        setReviews(data || []);
+        console.log('API returned data:', data);
+        
+        // Add mock pesanan for null values
+        const processedReviews = (data as any[])
+          .map((review: any) => ({
+            ...review,
+            // Add mock pesanan data if it's null
+            pesanan: review.pesanan || {
+              id: review.id, 
+              emailPengguna: email,
+              namaBarang: "Item " + review.id,
+              kondisiBarang: "Good",
+              statusPesanan: "Pesanan Selesai",
+              tanggalServis: new Date().toISOString().split('T')[0]
+            },
+            createdAt: review.createdAt || new Date().toISOString()
+          }));
+        
+        console.log('Processed reviews:', processedReviews);
+        setReviews(processedReviews);
         
         // Calculate stats
-        if (data && data.length > 0) {
-          const totalRating = data.reduce((sum: number, review: any) => sum + review.rating, 0);
+        if (processedReviews.length > 0) {
+          const totalRating = processedReviews.reduce((sum, review) => sum + review.rating, 0);
           setStats({
-            total: data.length,
-            averageRating: parseFloat((totalRating / data.length).toFixed(1))
+            total: processedReviews.length,
+            averageRating: parseFloat((totalRating / processedReviews.length).toFixed(1))
           });
         }
         
         // If in edit mode, find the specific review
         if (idPesanan && mode === 'edit') {
-          const reviewForPesanan = data.find((review: any) => review.pesanan.id === parseInt(idPesanan));
+          const reviewForPesanan = processedReviews.find(review => 
+            review.pesanan && review.pesanan.id === parseInt(idPesanan)
+          );
           
           if (reviewForPesanan) {
             setInitialReview({
@@ -76,6 +114,7 @@ export default function ReviewPage() {
           }
         }
       } else {
+        console.error('API request failed:', res.status);
         toast.error('Failed to fetch reviews');
       }
     } catch (err) {
@@ -87,15 +126,7 @@ export default function ReviewPage() {
   };
 
   if (loading) {
-    return (
-      <>
-        <NavbarUSer />
-        <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          <p className="mt-4 text-gray-500">Memuat...</p>
-        </div>
-      </>
-    )
+    return <LoadingView />;
   }
   
   return (
@@ -186,6 +217,7 @@ export default function ReviewPage() {
             ) : (
               <ReviewList 
                 userEmail={user.email}
+                reviewData={reviews}
                 onEditReview={(report) => {
                   router.push(`/review?id=${report.pesanan.id}&mode=edit`)
                 }}
@@ -195,5 +227,15 @@ export default function ReviewPage() {
         )}
       </div>
     </>
-  )
+  );
+}
+
+// export
+// main component wrapped in Suspense for loading state
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={<LoadingView />}>
+      <ReviewPageContent />
+    </Suspense>
+  );
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import NavbarUSer from '@/components/ui/navbar/navbar-user'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,20 @@ import { Card } from '@/components/ui/card'
 import { Star } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 
-export default function CreateReviewPage() {
+// Loading 
+function LoadingView() {
+  return (
+    <>
+      <NavbarUSer />
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#10316B]"></div>
+      </div>
+    </>
+  )
+}
+
+// Main 
+function CreateReviewContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
@@ -92,7 +105,7 @@ export default function CreateReviewPage() {
     fetchData()
   }, [idPesanan, router])
   
-    const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (rating === 0) {
@@ -260,5 +273,15 @@ export default function CreateReviewPage() {
         </div>
       </main>
     </>
+  )
+}
+
+// Export 
+// Wrapping
+export default function CreateReviewPage() {
+  return (
+    <Suspense fallback={<LoadingView />}>
+      <CreateReviewContent />
+    </Suspense>
   )
 }

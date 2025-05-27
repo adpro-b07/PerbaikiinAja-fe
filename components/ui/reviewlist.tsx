@@ -17,18 +17,29 @@ interface ReviewListProps {
   userEmail?: string
   teknisiEmail?: string
   onEditReview?: (report: Report) => void
+  reviewData?: Report[] // pre-fetched reviews
 }
 
 export default function ReviewList({ 
   userEmail,
   teknisiEmail,
-  onEditReview 
+  onEditReview,
+  reviewData 
 }: ReviewListProps) {
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   
   useEffect(() => {
+    // use data
+    if (reviewData !== undefined) {
+      console.log('Using provided review data:', reviewData);
+      setReports(reviewData);
+      setLoading(false);
+      return;
+    }
+    
+    // fetch data from API
     const fetchReports = async () => {
       try {
         let endpoint = '/api/report'
@@ -39,18 +50,32 @@ export default function ReviewList({
           endpoint = `/api/report/teknisi/${encodeURIComponent(teknisiEmail)}`
         }
         
+        console.log('Fetching reviews from API:', endpoint);
         const response = await fetch(endpoint, {
           credentials: 'include' 
         })
-        
         
         if (!response.ok) {
           throw new Error(`Failed to fetch reviews: ${response.status}`)
         }
         
         const data = await response.json()
-        setReports(Array.isArray(data) ? data : [])
+        const processedData = Array.isArray(data) ? data : [data];
+        
+        // mock
+        const processedReports = processedData.map(report => ({
+          ...report,
+          pesanan: report.pesanan || {
+            id: report.id,
+            emailPengguna: userEmail || 'unknown@example.com'
+          },
+          createdAt: report.createdAt || new Date().toISOString()
+        }));
+        
+        console.log('Processed reports:', processedReports);
+        setReports(processedReports)
       } catch (err) {
+        console.error('Error fetching reviews:', err);
         setError('Gagal memuat ulasan')
       } finally {
         setLoading(false)
@@ -62,7 +87,7 @@ export default function ReviewList({
     } else {
       setLoading(false)
     }
-  }, [userEmail, teknisiEmail])
+  }, [userEmail, teknisiEmail, reviewData])
   
   if (loading) {
     return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div></div>
