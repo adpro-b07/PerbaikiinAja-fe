@@ -35,7 +35,7 @@ export default function AdminPage() {
     }
     
     // Proceed with normal page loading
-    fetchData();
+    setLoading(false);
     }, [router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
