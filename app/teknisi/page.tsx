@@ -40,14 +40,6 @@ export default function TeknisiPage() {
     const user = JSON.parse(localStorage.getItem("user") || "null");
     if (!user?.email) return;
 
-<<<<<<< Updated upstream
-  try {
-    const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${user.token}`
-=======
     try {
       const res = await fetch(`/api/pesanan/teknisi/${user.email}`, {
         credentials: "include",
@@ -88,7 +80,6 @@ export default function TeknisiPage() {
         
         console.log("Calculated total income:", penghasilan);
         setTotalPenghasilan(penghasilan);
->>>>>>> Stashed changes
       }
     } catch (err) {
       console.error("Gagal fetch pesanan:", err);
@@ -145,17 +136,19 @@ const handleSubmitLaporan = async () => {
   if (!laporan || selectedOrderId === null) return;
 
   const user = JSON.parse(localStorage.getItem("user") || "null");
-  if (!user || !user.token) {
-    alert("Token tidak ditemukan. Silakan login ulang.");
+  if (!user?.email) {
+    alert("Informasi user tidak ditemukan. Silakan login ulang.");
     return;
   }
 
   try {
+    // Submit laporan and update status
     const response = await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${user.token}`, // ← Tambahkan ini
+        "Authorization": `Bearer ${user.token}`
       },
       body: JSON.stringify({ laporan, emailTeknisi: user.email }),
     });
@@ -166,10 +159,35 @@ const handleSubmitLaporan = async () => {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    alert("Laporan berhasil dikirim.");
+    // Update order status in local state
+    const completedOrder = orders.find(o => o.id === selectedOrderId);
+    if (completedOrder) {
+      const harga = typeof completedOrder.estimasiHarga === 'string' 
+            ? parseInt(completedOrder.estimasiHarga) 
+            : (completedOrder.estimasiHarga || 0);
+      
+      // Update order status
+      setOrders(prev => prev.map(order => 
+        order.id === selectedOrderId 
+          ? {...order, statusPesanan: "Pesanan Selesai"} 
+          : order
+      ));
+      
+      // Update completed count and income
+      setSelesaiCount(prev => prev + 1);
+      setTotalPenghasilan(prev => prev + harga);
+      
+      console.log("Added to penghasilan:", harga);
+      console.log("New total penghasilan:", totalPenghasilan + harga);
+    }
+
+    alert("Laporan berhasil dikirim dan pesanan diselesaikan.");
     setShowSelesaikanModal(false);
     setSelectedOrderId(null);
     setLaporan("");
+    
+    // Refresh orders to ensure everything is updated
+    fetchOrders();
   } catch (err) {
     console.error("Gagal kirim laporan:", err);
     alert("Gagal kirim laporan. Coba login ulang atau hubungi admin.");
@@ -270,25 +288,30 @@ const handleSubmitLaporan = async () => {
         <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
             <h2 className="text-lg font-semibold mb-4">Selesaikan Pesanan</h2>
-            <label className="block mb-2 text-sm">Laporan:</label>
+            <label htmlFor="laporan-textarea" className="block mb-2 text-sm">Laporan:</label>
             <textarea
+              id="laporan-textarea"
               className="w-full p-2 border rounded mb-4"
               rows={3}
               value={laporan}
               onChange={(e) => setLaporan(e.target.value)}
+              placeholder="Tuliskan laporan pengerjaan di sini..."
             ></textarea>
 
             <div className="flex justify-end space-x-3">
               <button
+                type="button"
                 onClick={() => {
                   setShowSelesaikanModal(false);
                   setSelectedOrderId(null);
+                  setLaporan(""); // Reset the laporan state when closing
                 }}
                 className="px-4 py-2 border rounded hover:bg-gray-100"
               >
                 Cancel
               </button>
               <button
+                type="button" 
                 onClick={handleSubmitLaporan}
                 className="px-4 py-2 bg-[#10316B] text-white rounded hover:bg-[#0c244d]"
               >
