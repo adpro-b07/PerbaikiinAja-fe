@@ -132,67 +132,59 @@ export default function TeknisiPage() {
     setShowSelesaikanModal(true);
   };
 
-const handleSubmitLaporan = async () => {
-  if (!laporan || selectedOrderId === null) return;
+  const handleSubmitLaporan = async () => {
+    if (!laporan || selectedOrderId === null) return;
 
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-  if (!user?.email) {
-    alert("Informasi user tidak ditemukan. Silakan login ulang.");
-    return;
-  }
-
-  try {
-    // Submit laporan and update status
-    const response = await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${user.token}`
-      },
-      body: JSON.stringify({ laporan, emailTeknisi: user.email }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("HTTP Error:", response.status, errorData);
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (!user?.email) {
+      alert("Informasi user tidak ditemukan. Silakan login ulang.");
+      return;
     }
 
-    // Update order status in local state
-    const completedOrder = orders.find(o => o.id === selectedOrderId);
-    if (completedOrder) {
-      const harga = typeof completedOrder.estimasiHarga === 'string' 
-            ? parseInt(completedOrder.estimasiHarga) 
-            : (completedOrder.estimasiHarga || 0);
-      
-      // Update order status
-      setOrders(prev => prev.map(order => 
-        order.id === selectedOrderId 
-          ? {...order, statusPesanan: "Pesanan Selesai"} 
-          : order
-      ));
-      
-      // Update completed count and income
-      setSelesaiCount(prev => prev + 1);
-      setTotalPenghasilan(prev => prev + harga);
-      
-      console.log("Added to penghasilan:", harga);
-      console.log("New total penghasilan:", totalPenghasilan + harga);
-    }
+    try {
+      // 1. First, submit the laporan
+      const response = await fetch(`/api/laporan-teknisi/create/${selectedOrderId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json"
+          // Removed token authorization to use session auth
+        },
+        body: JSON.stringify({ laporan, emailTeknisi: user.email }),
+      });
 
-    alert("Laporan berhasil dikirim dan pesanan diselesaikan.");
-    setShowSelesaikanModal(false);
-    setSelectedOrderId(null);
-    setLaporan("");
-    
-    // Refresh orders to ensure everything is updated
-    fetchOrders();
-  } catch (err) {
-    console.error("Gagal kirim laporan:", err);
-    alert("Gagal kirim laporan. Coba login ulang atau hubungi admin.");
-  }
-};
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("HTTP Error:", response.status, errorData);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // 2. Then, explicitly update the order status in backend
+      const updateStatusResponse = await fetch(`/api/pesanan/update-status/${selectedOrderId}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ status: "SELESAI" }),
+      });
+
+      if (!updateStatusResponse.ok) {
+        throw new Error("Gagal mengubah status pesanan");
+      }
+
+      alert("Laporan berhasil dikirim dan pesanan diselesaikan.");
+      setShowSelesaikanModal(false);
+      setSelectedOrderId(null);
+      setLaporan("");
+      
+      // 3. Refresh orders to get updated data from backend
+      fetchOrders();
+    } catch (err) {
+      console.error("Gagal kirim laporan:", err);
+      alert("Gagal menyelesaikan pesanan. Coba lagi atau hubungi admin.");
+    }
+  };
 
 
 

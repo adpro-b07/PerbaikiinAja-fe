@@ -14,7 +14,7 @@ export default function Home() {
     } else if (user.role === 'teknisi') {
       router.replace('/teknisi')
     } else if (user.role === 'user') {
-      router.replace('/user')
+      router.replace('/dashboard')
     } else {
       router.replace('/home')
     }
