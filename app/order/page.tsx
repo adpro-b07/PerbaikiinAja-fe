@@ -30,7 +30,6 @@ export default function OrderPage() {
 
   useEffect(() => {
     fetchOrders();
-    // Fetch payment methods
     const fetchPaymentMethods = async () => {
       try {
         const res = await fetch("/api/payment");
@@ -41,7 +40,6 @@ export default function OrderPage() {
       }
     };
     fetchPaymentMethods();
-    // Fetch active coupons
     const fetchKupon = async () => {
       try {
         const res = await fetch("/api/kupon/active");
@@ -93,7 +91,6 @@ export default function OrderPage() {
     }
   };
 
-  // Cancel order handler
   const handleCancelOrder = async (idPesanan: number) => {
     if (!window.confirm("Are you sure you want to cancel this order?")) return;
     try {
@@ -112,6 +109,41 @@ export default function OrderPage() {
       alert("Failed to cancel order");
     }
   };
+
+  const handleConfirmOrder = async (idPesanan: number) => {
+    try {
+      const res = await fetch(`/api/pesanan/update-status/${idPesanan}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "DIKERJAKAN" }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        fetchOrders();
+      } else {
+        // Handle the error response safely
+        const text = await res.text();
+        let errorMessage = `Error: ${res.status} ${res.statusText}`;
+        
+        if (text) {
+          try {
+            const errorData = JSON.parse(text);
+            errorMessage = errorData.message || errorMessage;
+          } catch (e) {
+            // If not valid JSON, use the text or status
+            errorMessage = text || errorMessage;
+          }
+        }
+        
+        console.error("Failed to confirm order", errorMessage);
+        alert(`Gagal konfirmasi pesanan: ${errorMessage}`);
+      }
+    } catch (err) {
+      console.error("Failed to confirm order", err);
+      alert("Terjadi kesalahan saat konfirmasi pesanan");
+    }
+  };
+
 
   return (
     <main className="min-h-screen bg-white p-8">
@@ -240,6 +272,15 @@ export default function OrderPage() {
                           onClick={() => handleCancelOrder(order.id)}
                         >
                           Cancel
+                        </button>
+                      )}
+                      {order.statusPesanan ===
+                        "Menunggu Konfirmasi Pengguna" && (
+                        <button
+                          className="ml-2 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                          onClick={() => handleConfirmOrder(order.id)}
+                        >
+                          Konfirmasi
                         </button>
                       )}
                     </td>
